@@ -145,6 +145,7 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(.5)}
   <div class="logo">✈ Voyager</div>
   <div class="topbar-btns">
     <button class="tbtn primary" id="B_NEW_TRIP">＋ New Trip</button>
+    <button class="tbtn" id="B_SORT">🔽 Newest</button>
     <button class="tbtn" id="B_SETTINGS">⚙️</button>
   </div>
 </div>
@@ -181,7 +182,7 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(.5)}
         <option value="ILS">₪ ILS</option><option value="JPY">¥ JPY</option><option value="AUD">A$ AUD</option>
         <option value="CAD">C$ CAD</option><option value="CHF">CHF</option><option value="MXN">MX$ MXN</option>
         <option value="INR">₹ INR</option><option value="AED">AED</option><option value="THB">฿ THB</option>
-        <option value="SGD">S$ SGD</option><option value="TRY">₺ TRY</option>
+        <option value="SGD">S$ SGD</option><option value="TRY">₺ TRY</option><option value="PLN">zł PLN</option>
       </select>
     </div>
     <div class="btn2">
@@ -202,7 +203,7 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(.5)}
         <option value="ILS">₪ ILS</option><option value="JPY">¥ JPY</option><option value="AUD">A$ AUD</option>
         <option value="CAD">C$ CAD</option><option value="CHF">CHF</option><option value="MXN">MX$ MXN</option>
         <option value="INR">₹ INR</option><option value="AED">AED</option><option value="THB">฿ THB</option>
-        <option value="SGD">S$ SGD</option><option value="TRY">₺ TRY</option>
+        <option value="SGD">S$ SGD</option><option value="TRY">₺ TRY</option><option value="PLN">zł PLN</option>
       </select>
     </div>
     <div id="RATE_SECTION" style="display:none">
@@ -293,14 +294,14 @@ var EMOJIS=['✈️','🌍','🏖️','🏔️','🗼','🌸','🎡','🏝️','
 var COLORS=['#f0a500','#e05c2a','#2dd4a0','#3b82f6','#7c6fcd','#f05252','#10b981','#ec4899','#0891b2','#f97316','#1e3a5f','#4a1942','#064e3b','#374151','#f8fafc','#fef3c7'];
 var GTYPES={flight:{i:'✈️',l:'Flights'},hotel:{i:'🏨',l:'Hotels'},gas:{i:'⛽',l:'Gas'},car:{i:'🚗',l:'Car Rental'},insurance:{i:'🛡️',l:'Insurance'},visa:{i:'📋',l:'Visa/Entry'}};
 var CCOLORS={food:'#f0a500',transport:'#2dd4a0',hotel:'#7c6fcd',activities:'#e05c2a',shopping:'#f05252',other:'#7a8fa6',flight:'#3b82f6',gas:'#2dd4a0',car:'#06b6d4',insurance:'#8b5cf6',visa:'#ec4899'};
-var SYMS={USD:'$',EUR:'€',GBP:'£',ILS:'₪',JPY:'¥',AUD:'A$',CAD:'C$',CHF:'CHF',MXN:'MX$',INR:'₹',AED:'AED',THB:'฿',SGD:'S$',TRY:'₺'};
+var SYMS={USD:'$',EUR:'€',GBP:'£',ILS:'₪',JPY:'¥',AUD:'A$',CAD:'C$',CHF:'CHF',MXN:'MX$',INR:'₹',AED:'AED',THB:'฿',SGD:'S$',TRY:'₺',PLN:'zł'};
 var DEF_COLOR='#3b82f6';
 
 var _mem={};
 function sGet(k){try{return localStorage.getItem(k);}catch(e){return _mem[k]||null;}}
 function sSet(k,v){try{localStorage.setItem(k,v);}catch(e){_mem[k]=v;}}
 
-var trips=[],settings={sec:'',rates:{}};
+var trips=[],settings={sec:"",rates:{}};var sortAsc=false;
 var curTripId=null,editTripId=null,curDay=null;
 var pickEmoji=EMOJIS[0],pickColor=DEF_COLOR;
 
@@ -685,6 +686,7 @@ document.addEventListener('click',function(e){
     // Static button IDs
     if(eid==='B_NEW_TRIP'||eid==='B_FAB'){openTripForm();return;}
     if(eid==='B_SETTINGS'){openSettings();return;}
+    if(eid==='B_SORT'){sortAsc=!sortAsc;document.getElementById('B_SORT').textContent=sortAsc?'🔼 Oldest':'🔽 Newest';renderHome();return;}
     if(eid==='B_TRIP_CANCEL'){closeOvl('OVL_TRIP');return;}
     if(eid==='B_TRIP_SAVE'){saveTrip();return;}
     if(eid==='B_SET_CANCEL'){closeOvl('OVL_SETTINGS');return;}
