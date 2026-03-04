@@ -1,0 +1,752 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Voyager Expenses</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
+:root{
+  --bg:#0f1923;--surf:#1a2535;--surf2:#243044;
+  --accent:#f0a500;--accent2:#e05c2a;
+  --text:#eef2f7;--muted:#7a8fa6;--border:rgba(255,255,255,0.08);
+  --green:#2dd4a0;--red:#f05252;--r:14px;
+  --fh:'Syne',sans-serif;--fb:'DM Sans',sans-serif;
+}
+body{background:var(--bg);color:var(--text);font-family:var(--fb);min-height:100vh;overflow-x:hidden}
+.topbar{position:sticky;top:0;z-index:50;background:var(--bg);padding:16px 16px 10px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border)}
+.logo{font-family:var(--fh);font-size:22px;font-weight:800;background:linear-gradient(135deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.topbar-btns{display:flex;gap:8px}
+.tbtn{background:var(--surf2);border:1px solid var(--border);border-radius:10px;padding:8px 14px;color:var(--text);font-family:var(--fb);font-size:13px;font-weight:500;cursor:pointer;user-select:none;display:inline-block}
+.tbtn.primary{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;border-color:transparent}
+.tbtn.danger{background:rgba(240,82,82,0.12);color:var(--red);border-color:transparent}
+.screen{display:none;padding:12px 14px 120px}.screen.on{display:block}
+.trip-card{background:var(--surf);border:1px solid var(--border);border-radius:var(--r);margin-bottom:12px;overflow:hidden}
+.trip-head{display:flex;align-items:center;gap:12px;padding:14px;cursor:pointer;user-select:none}
+.trip-icon{width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0}
+.trip-info{flex:1;min-width:0}
+.trip-name{font-family:var(--fh);font-weight:700;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.trip-sub{font-size:11px;color:var(--muted);margin-top:2px}
+.trip-amt{text-align:right;flex-shrink:0}
+.trip-amt .big{font-family:var(--fh);font-weight:700;font-size:17px;color:var(--accent)}
+.trip-amt .small{font-size:11px;color:var(--muted);margin-top:1px}
+.chev{color:var(--muted);font-size:20px;margin-left:4px;transition:transform .2s;flex-shrink:0}
+.trip-card.open .chev{transform:rotate(90deg)}
+.trip-body{display:none;border-top:1px solid var(--border);padding:12px 14px 14px}
+.trip-card.open .trip-body{display:block}
+.trip-desc-text{font-size:12px;color:var(--muted);font-style:italic;margin-bottom:10px;line-height:1.5}
+.stats3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px}
+.stat{background:var(--surf2);border-radius:10px;padding:10px 6px;text-align:center}
+.stat .v{font-family:var(--fh);font-size:13px;font-weight:700}
+.stat .s{font-size:10px;color:var(--muted);margin-top:1px}
+.stat .l{font-size:10px;color:var(--muted);margin-top:3px;text-transform:uppercase;letter-spacing:.4px}
+.row3{display:flex;gap:8px}
+.row3 .tbtn{flex:1;text-align:center;padding:10px 4px;font-size:12px}
+.fab{position:fixed;bottom:88px;right:18px;z-index:100;width:56px;height:56px;border-radius:16px;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;font-size:30px;line-height:56px;text-align:center;box-shadow:0 6px 20px rgba(240,165,0,0.4);cursor:pointer;user-select:none;border:none}
+.overlay{display:none;position:fixed;inset:0;z-index:200;background:rgba(0,0,0,0.65);backdrop-filter:blur(3px);align-items:flex-end}
+.overlay.on{display:flex}
+.sheet{background:var(--surf);border-radius:22px 22px 0 0;width:100%;max-height:90vh;overflow-y:auto;padding:20px 18px 44px;animation:up .22s ease}
+@keyframes up{from{transform:translateY(100%)}to{transform:none}}
+.handle{width:38px;height:4px;background:var(--border);border-radius:2px;margin:0 auto 18px}
+.sheet h2{font-family:var(--fh);font-size:19px;font-weight:700;margin-bottom:18px}
+.field{margin-bottom:14px}
+.field label{display:block;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.7px;margin-bottom:5px}
+.field input,.field select,.field textarea{width:100%;background:var(--surf2);border:1px solid var(--border);border-radius:10px;color:var(--text);font-family:var(--fb);font-size:15px;padding:11px 13px;outline:none;-webkit-appearance:none;appearance:none}
+.field textarea{resize:none;line-height:1.5}
+.field input:focus,.field select:focus,.field textarea:focus{border-color:var(--accent)}
+.field select option{background:var(--surf2)}
+.frow{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.crow{display:grid;grid-template-columns:100px 1fr;gap:10px}
+.btn2{display:flex;gap:10px;margin-top:10px}
+.btn2 button{flex:1;padding:12px 8px;border-radius:10px;border:none;font-family:var(--fh);font-size:14px;font-weight:600;cursor:pointer;user-select:none}
+.btn2 .cancel{background:var(--surf2);color:var(--text)}
+.btn2 .ok{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff}
+.preview-box{display:flex;align-items:center;gap:12px;background:var(--surf2);border-radius:12px;padding:12px 14px;margin-bottom:14px}
+.preview-icon{width:52px;height:52px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:28px;flex-shrink:0;transition:background .15s}
+.preview-text{font-size:12px;color:var(--muted);line-height:1.5}
+.emoji-wrap{display:flex;flex-wrap:wrap;gap:7px;margin-top:6px}
+.epick{width:42px;height:42px;border-radius:9px;border:2px solid transparent;font-size:21px;line-height:38px;text-align:center;cursor:pointer;user-select:none;transition:border-color .1s,transform .1s}
+.epick.sel{border-color:#fff;transform:scale(1.1)}
+.color-wrap{display:flex;flex-wrap:wrap;gap:7px;margin-top:6px}
+.cpick{width:32px;height:32px;border-radius:8px;border:2px solid transparent;cursor:pointer;user-select:none;transition:transform .1s,border-color .1s;position:relative}
+.cpick.sel{border-color:#fff;transform:scale(1.12)}
+.cpick.sel::after{content:'✓';position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.5)}
+.back-btn{background:none;border:none;color:var(--muted);font-family:var(--fb);font-size:14px;cursor:pointer;padding:0;margin-bottom:12px;display:flex;align-items:center;gap:4px}
+.export-btn{background:var(--surf2);border:1px solid var(--border);border-radius:10px;padding:8px 12px;color:var(--text);font-size:12px;cursor:pointer;white-space:nowrap;user-select:none;flex-shrink:0}
+.sumbar{background:var(--surf);border:1px solid var(--border);border-radius:var(--r);padding:14px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;text-align:center;margin-bottom:10px}
+.sumbar .v{font-family:var(--fh);font-size:14px;font-weight:700}
+.sumbar .s{font-size:10px;color:var(--muted);margin-top:1px}
+.sumbar .l{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-top:3px}
+.tabs{display:flex;gap:6px;margin-bottom:8px}
+.tab{flex:1;padding:9px 4px;border-radius:10px;border:none;font-family:var(--fh);font-size:12px;font-weight:600;background:var(--surf2);color:var(--muted);cursor:pointer;user-select:none}
+.tab.on{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff}
+.tabpane{display:none}.tabpane.on{display:block}
+.sec-title{font-family:var(--fh);font-weight:700;font-size:15px;margin:18px 0 10px;display:flex;align-items:center;gap:8px}
+.badge{background:var(--surf2);color:var(--muted);font-size:11px;padding:2px 8px;border-radius:20px}
+.gcards{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.gcard{background:var(--surf);border:1px solid var(--border);border-radius:var(--r);padding:13px;cursor:pointer;user-select:none}
+.gcard .gi{font-size:24px;margin-bottom:7px}
+.gcard .gl{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px}
+.gcard .ga{font-family:var(--fh);font-size:17px;font-weight:700;color:var(--accent);margin-top:3px}
+.gcard .gs{font-size:10px;color:var(--muted);margin-top:1px}
+.gcard .gc{font-size:10px;color:var(--muted);margin-top:2px}
+.exp-list{background:var(--surf);border:1px solid var(--border);border-radius:var(--r);overflow:hidden;margin-top:10px}
+.exp-row{display:flex;align-items:center;gap:10px;padding:11px 13px;border-bottom:1px solid var(--border)}
+.exp-row:last-child{border-bottom:none}
+.dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.exp-i{flex:1;min-width:0}
+.exp-d{font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.exp-c{font-size:11px;color:var(--muted);margin-top:1px}
+.exp-a{text-align:right;flex-shrink:0}
+.exp-a .am{font-family:var(--fh);font-size:13px;font-weight:700}
+.exp-a .as{font-size:10px;color:var(--muted);margin-top:1px}
+.xbtn{background:none;border:none;color:var(--muted);font-size:18px;cursor:pointer;padding:3px;flex-shrink:0;user-select:none}
+.day-card{background:var(--surf);border:1px solid var(--border);border-radius:var(--r);margin-bottom:9px;overflow:hidden}
+.day-head{display:flex;align-items:center;justify-content:space-between;padding:13px 14px;cursor:pointer;user-select:none}
+.day-lbl{font-family:var(--fh);font-weight:700;font-size:14px}
+.day-dt{font-size:11px;color:var(--muted);margin-top:2px}
+.day-right{display:flex;align-items:center;gap:8px}
+.day-tot .v{font-family:var(--fh);font-size:15px;font-weight:700;color:var(--green);text-align:right}
+.day-tot .s{font-size:10px;color:var(--muted);margin-top:1px;text-align:right}
+.dchev{color:var(--muted);font-size:18px;transition:transform .2s}
+.day-card.open .dchev{transform:rotate(90deg)}
+.day-body{display:none;border-top:1px solid var(--border)}
+.day-card.open .day-body{display:block}
+.day-notes{display:flex;align-items:flex-start;gap:8px;padding:9px 13px;background:rgba(240,165,0,0.05);border-bottom:1px solid var(--border)}
+.day-notes .ni{font-size:13px;flex-shrink:0;margin-top:1px}
+.day-notes .nt{font-size:12px;color:var(--muted);font-style:italic;flex:1;line-height:1.5}
+.day-notes .ne{background:none;border:none;color:var(--muted);font-size:14px;cursor:pointer;padding:2px 4px;flex-shrink:0;user-select:none}
+.add-note-btn{width:calc(100% - 22px);margin:8px 11px 0;padding:9px;background:transparent;border:1px dashed rgba(240,165,0,0.3);border-radius:10px;color:rgba(240,165,0,0.6);font-family:var(--fb);font-size:12px;cursor:pointer;text-align:left;user-select:none;display:block}
+.add-exp-btn{width:calc(100% - 22px);margin:8px 11px;padding:10px;background:var(--surf2);border:1px dashed var(--border);border-radius:10px;color:var(--muted);font-family:var(--fb);font-size:12px;cursor:pointer;user-select:none;display:block;text-align:left}
+.add-gen-btn{width:100%;margin-top:10px;padding:11px;background:var(--surf2);border:1px solid var(--border);border-radius:10px;color:var(--text);font-family:var(--fh);font-size:13px;font-weight:600;cursor:pointer;user-select:none}
+.cat-bar-row{margin-bottom:13px}
+.cat-bar-top{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:5px}
+.cat-bar-top .name{font-size:13px;font-weight:500}
+.cat-bar-top .right{text-align:right}
+.cat-bar-top .right .v{font-family:var(--fh);font-size:13px;font-weight:700}
+.cat-bar-top .right .s{font-size:10px;color:var(--muted)}
+.cat-bar-bg{height:5px;border-radius:3px;background:var(--surf2);overflow:hidden}
+.cat-bar-fill{height:100%;border-radius:3px}
+.rate-note{background:rgba(45,212,160,0.08);border:1px solid rgba(45,212,160,0.2);border-radius:10px;padding:10px 12px;font-size:12px;color:var(--green);margin-bottom:12px}
+.empty{text-align:center;padding:60px 20px;color:var(--muted)}
+.empty .ei{font-size:52px;margin-bottom:14px}
+.empty p{font-size:13px;line-height:1.6}
+.toast{position:fixed;bottom:110px;left:50%;transform:translateX(-50%) translateY(10px);background:var(--green);color:#fff;padding:9px 18px;border-radius:20px;font-size:12px;font-weight:500;opacity:0;transition:opacity .2s,transform .2s;pointer-events:none;white-space:nowrap;z-index:999}
+.toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
+input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(.5)}
+</style>
+</head>
+<body>
+
+<div class="toast" id="toast"></div>
+
+<div class="topbar">
+  <div class="logo">✈ Voyager</div>
+  <div class="topbar-btns">
+    <button class="tbtn primary" id="B_NEW_TRIP">＋ New Trip</button>
+    <button class="tbtn" id="B_SETTINGS">⚙️</button>
+  </div>
+</div>
+
+<div class="screen on" id="SCR_HOME">
+  <div id="trip-list"></div>
+</div>
+
+<div class="screen" id="SCR_DETAIL">
+  <div id="detail-wrap"></div>
+</div>
+
+<button class="fab" id="B_FAB">+</button>
+
+<div class="overlay" id="OVL_TRIP">
+  <div class="sheet">
+    <div class="handle"></div>
+    <h2 id="trip-form-title">New Trip</h2>
+    <div class="field"><label>Trip Name</label><input id="F_TNAME" type="text" placeholder="e.g. Paris Weekend"></div>
+    <div class="field"><label>Description (optional)</label><textarea id="F_TDESC" rows="3" placeholder="e.g. Summer road trip through Italy"></textarea></div>
+    <div class="field">
+      <label>Icon Preview</label>
+      <div class="preview-box"><div class="preview-icon" id="F_PREV">✈️</div><div class="preview-text">Choose emoji &amp; color below</div></div>
+    </div>
+    <div class="field"><label>Emoji</label><div class="emoji-wrap" id="F_EMOJIS"></div></div>
+    <div class="field"><label>Background Color</label><div class="color-wrap" id="F_COLORS"></div></div>
+    <div class="frow">
+      <div class="field"><label>Start Date</label><input id="F_TSTART" type="date"></div>
+      <div class="field"><label>End Date</label><input id="F_TEND" type="date"></div>
+    </div>
+    <div class="field"><label>Currency</label>
+      <select id="F_TCUR">
+        <option value="USD">$ USD</option><option value="EUR">€ EUR</option><option value="GBP">£ GBP</option>
+        <option value="ILS">₪ ILS</option><option value="JPY">¥ JPY</option><option value="AUD">A$ AUD</option>
+        <option value="CAD">C$ CAD</option><option value="CHF">CHF</option><option value="MXN">MX$ MXN</option>
+        <option value="INR">₹ INR</option><option value="AED">AED</option><option value="THB">฿ THB</option>
+        <option value="SGD">S$ SGD</option><option value="TRY">₺ TRY</option>
+      </select>
+    </div>
+    <div class="btn2">
+      <button class="cancel" id="B_TRIP_CANCEL">Cancel</button>
+      <button class="ok" id="B_TRIP_SAVE">Save Trip</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="OVL_SETTINGS">
+  <div class="sheet">
+    <div class="handle"></div>
+    <h2>Settings</h2>
+    <div class="field"><label>Secondary Currency</label>
+      <select id="F_SECCUR">
+        <option value="">— Disabled —</option>
+        <option value="USD">$ USD</option><option value="EUR">€ EUR</option><option value="GBP">£ GBP</option>
+        <option value="ILS">₪ ILS</option><option value="JPY">¥ JPY</option><option value="AUD">A$ AUD</option>
+        <option value="CAD">C$ CAD</option><option value="CHF">CHF</option><option value="MXN">MX$ MXN</option>
+        <option value="INR">₹ INR</option><option value="AED">AED</option><option value="THB">฿ THB</option>
+        <option value="SGD">S$ SGD</option><option value="TRY">₺ TRY</option>
+      </select>
+    </div>
+    <div id="RATE_SECTION" style="display:none">
+      <div class="rate-note">💱 1 primary = how many <strong id="RATE_NAME"></strong></div>
+      <div id="RATE_FIELDS"></div>
+    </div>
+    <div class="btn2">
+      <button class="cancel" id="B_SET_CANCEL">Cancel</button>
+      <button class="ok" id="B_SET_SAVE">Save</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="OVL_GEN">
+  <div class="sheet">
+    <div class="handle"></div>
+    <h2>Add General Expense</h2>
+    <div class="field"><label>Type</label>
+      <select id="F_GTYPE">
+        <option value="flight">✈️ Flight</option><option value="hotel">🏨 Hotel</option>
+        <option value="gas">⛽ Gas / Transport</option><option value="car">🚗 Car Rental</option>
+        <option value="insurance">🛡️ Insurance</option><option value="visa">📋 Visa / Entry</option>
+      </select>
+    </div>
+    <div class="field"><label>Description</label><input id="F_GDESC" type="text" placeholder="e.g. Flight TLV to JFK"></div>
+    <div class="crow">
+      <div class="field"><label>Currency</label>
+        <select id="F_GCUR">
+          <option value="USD">$ USD</option><option value="EUR">€ EUR</option><option value="GBP">£ GBP</option>
+          <option value="ILS">₪ ILS</option><option value="JPY">¥ JPY</option><option value="AUD">A$ AUD</option>
+          <option value="CAD">C$ CAD</option><option value="CHF">CHF</option><option value="MXN">MX$ MXN</option>
+        </select>
+      </div>
+      <div class="field"><label>Amount</label><input id="F_GAMT" type="number" placeholder="0.00" min="0" step="0.01"></div>
+    </div>
+    <div class="btn2">
+      <button class="cancel" id="B_GEN_CANCEL">Cancel</button>
+      <button class="ok" id="B_GEN_SAVE">Add</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="OVL_EXP">
+  <div class="sheet">
+    <div class="handle"></div>
+    <h2 id="EXP_TITLE">Add Expense</h2>
+    <div class="field"><label>Category</label>
+      <select id="F_ECAT">
+        <option value="food">🍔 Food and Drinks</option><option value="transport">🚌 Transport</option>
+        <option value="activities">🎭 Activities</option><option value="shopping">🛍️ Shopping</option>
+        <option value="hotel">🏨 Accommodation</option><option value="other">📦 Other</option>
+      </select>
+    </div>
+    <div class="field"><label>Description</label><input id="F_EDESC" type="text" placeholder="e.g. Lunch at restaurant"></div>
+    <div class="crow">
+      <div class="field"><label>Currency</label>
+        <select id="F_ECUR">
+          <option value="USD">$ USD</option><option value="EUR">€ EUR</option><option value="GBP">£ GBP</option>
+          <option value="ILS">₪ ILS</option><option value="JPY">¥ JPY</option><option value="AUD">A$ AUD</option>
+          <option value="CAD">C$ CAD</option><option value="CHF">CHF</option><option value="MXN">MX$ MXN</option>
+        </select>
+      </div>
+      <div class="field"><label>Amount</label><input id="F_EAMT" type="number" placeholder="0.00" min="0" step="0.01"></div>
+    </div>
+    <div class="btn2">
+      <button class="cancel" id="B_EXP_CANCEL">Cancel</button>
+      <button class="ok" id="B_EXP_SAVE">Add Expense</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="OVL_NOTES">
+  <div class="sheet">
+    <div class="handle"></div>
+    <h2 id="NOTES_TITLE">Day Notes</h2>
+    <div class="field"><label>Notes / Highlights (optional)</label>
+      <textarea id="F_NOTES" rows="5" placeholder="e.g. Visited the Eiffel Tower, amazing sunset..."></textarea>
+    </div>
+    <div class="btn2">
+      <button class="cancel" id="B_NOTES_CANCEL">Cancel</button>
+      <button class="ok" id="B_NOTES_SAVE">Save Notes</button>
+    </div>
+  </div>
+</div>
+
+<script>
+var EMOJIS=['✈️','🌍','🏖️','🏔️','🗼','🌸','🎡','🏝️','🌮','🍕','🎭','🚂','🛳️','🏕️','🌅','🎪','🎿','🏄','🗽','🌴','🦁','🐬','🎨','🍜','🍷','🏯'];
+var COLORS=['#f0a500','#e05c2a','#2dd4a0','#3b82f6','#7c6fcd','#f05252','#10b981','#ec4899','#0891b2','#f97316','#1e3a5f','#4a1942','#064e3b','#374151','#f8fafc','#fef3c7'];
+var GTYPES={flight:{i:'✈️',l:'Flights'},hotel:{i:'🏨',l:'Hotels'},gas:{i:'⛽',l:'Gas'},car:{i:'🚗',l:'Car Rental'},insurance:{i:'🛡️',l:'Insurance'},visa:{i:'📋',l:'Visa/Entry'}};
+var CCOLORS={food:'#f0a500',transport:'#2dd4a0',hotel:'#7c6fcd',activities:'#e05c2a',shopping:'#f05252',other:'#7a8fa6',flight:'#3b82f6',gas:'#2dd4a0',car:'#06b6d4',insurance:'#8b5cf6',visa:'#ec4899'};
+var SYMS={USD:'$',EUR:'€',GBP:'£',ILS:'₪',JPY:'¥',AUD:'A$',CAD:'C$',CHF:'CHF',MXN:'MX$',INR:'₹',AED:'AED',THB:'฿',SGD:'S$',TRY:'₺'};
+var DEF_COLOR='#3b82f6';
+
+var _mem={};
+function sGet(k){try{return localStorage.getItem(k);}catch(e){return _mem[k]||null;}}
+function sSet(k,v){try{localStorage.setItem(k,v);}catch(e){_mem[k]=v;}}
+
+var trips=[],settings={sec:'',rates:{}};
+var curTripId=null,editTripId=null,curDay=null;
+var pickEmoji=EMOJIS[0],pickColor=DEF_COLOR;
+
+function load(){
+  try{var d=sGet('voy3');if(d){var p=JSON.parse(d);trips=p.trips||[];settings=p.settings||{sec:'',rates:{}};if(!settings.rates)settings.rates={};}}catch(e){}
+}
+function save(){sSet('voy3',JSON.stringify({trips:trips,settings:settings}));}
+function getTrip(id){for(var i=0;i<trips.length;i++){if(trips[i].id===id)return trips[i];}return null;}
+
+function sym(c){return SYMS[c]||c;}
+function fmt(a,c){return sym(c)+parseFloat(a).toFixed(2);}
+function secAmt(a,pc){
+  if(!settings.sec||settings.sec===pc)return'';
+  var r=parseFloat(settings.rates[pc]||0);
+  if(!r)return'';
+  return '&#8776;'+sym(settings.sec)+(parseFloat(a)*r).toFixed(2);
+}
+function fdate(d){return new Date(d+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});}
+function getDays(t){
+  if(!t.start||!t.end)return[];
+  var a=[],s=new Date(t.start+'T00:00:00'),e=new Date(t.end+'T00:00:00');
+  for(var d=new Date(s);d<=e;d.setDate(d.getDate()+1))a.push(new Date(d).toISOString().slice(0,10));
+  return a;
+}
+function tGen(t){return(t.gen||[]).reduce(function(s,e){return s+parseFloat(e.amt||0);},0);}
+function tDay(t){var s=0;var dv=t.day||{};Object.keys(dv).forEach(function(k){dv[k].forEach(function(e){s+=parseFloat(e.amt||0);});});return s;}
+function tAll(t){return tGen(t)+tDay(t);}
+function catIcon(c){return{food:'🍔',transport:'🚌',hotel:'🏨',activities:'🎭',shopping:'🛍️',other:'📦'}[c]||'📦';}
+
+function toast(m){var el=document.getElementById('toast');el.innerHTML=m;el.classList.add('on');setTimeout(function(){el.classList.remove('on');},2000);}
+function showScreen(id){document.querySelectorAll('.screen').forEach(function(s){s.classList.remove('on');});document.getElementById(id).classList.add('on');}
+function openOvl(id){document.getElementById(id).classList.add('on');}
+function closeOvl(id){document.getElementById(id).classList.remove('on');}
+
+function renderHome(){
+  var el=document.getElementById('trip-list');
+  if(!trips.length){
+    el.innerHTML='<div class="empty"><div class="ei">🗺️</div><p>No trips yet.<br>Tap <strong>+ New Trip</strong> to start!</p></div>';
+    return;
+  }
+  var sorted=trips.slice().sort(function(a,b){return(b.start||'')>(a.start||'')?1:-1;});
+  var html='';
+  sorted.forEach(function(t){
+    var tot=tAll(t),cur=t.cur||'USD',nd=getDays(t).length,pd=nd>0?tot/nd:0;
+    var s1=secAmt(tot,cur),s2=secAmt(tGen(t),cur),s3=secAmt(tDay(t),cur),s4=nd>0?secAmt(pd,cur):'';
+    var bg=t.color||DEF_COLOR;
+    html+='<div class="trip-card" data-id="'+t.id+'">';
+    html+='<div class="trip-head" data-action="toggle" data-id="'+t.id+'">';
+    html+='<div class="trip-icon" style="background:'+bg+'">'+t.emoji+'</div>';
+    html+='<div class="trip-info"><div class="trip-name">'+t.name+'</div>';
+    html+='<div class="trip-sub">'+(t.start?fdate(t.start)+' to '+fdate(t.end):'No dates')+' · '+nd+' days</div></div>';
+    html+='<div class="trip-amt"><div class="big">'+fmt(tot,cur)+'</div>'+(s1?'<div class="small">'+s1+'</div>':'')+'<div class="small">total</div></div>';
+    html+='<div class="chev">›</div></div>';
+    html+='<div class="trip-body">'+(t.desc?'<div class="trip-desc-text">📝 '+t.desc+'</div>':'');
+    html+='<div class="stats3">';
+    html+='<div class="stat"><div class="v">'+fmt(tGen(t),cur)+'</div>'+(s2?'<div class="s">'+s2+'</div>':'')+'<div class="l">General</div></div>';
+    html+='<div class="stat"><div class="v">'+fmt(tDay(t),cur)+'</div>'+(s3?'<div class="s">'+s3+'</div>':'')+'<div class="l">Daily</div></div>';
+    html+='<div class="stat"><div class="v">'+(nd>0?fmt(pd,cur):'—')+'</div>'+(s4?'<div class="s">'+s4+'</div>':'')+'<div class="l">Per Day</div></div>';
+    html+='</div>';
+    html+='<div class="row3">';
+    html+='<button class="tbtn primary" data-action="detail" data-id="'+t.id+'">📋 Details</button>';
+    html+='<button class="tbtn" data-action="edit" data-id="'+t.id+'">✏️ Edit</button>';
+    html+='<button class="tbtn danger" data-action="del" data-id="'+t.id+'">🗑️</button>';
+    html+='</div></div></div>';
+  });
+  el.innerHTML=html;
+}
+
+function renderDetail(){
+  var t=getTrip(curTripId);
+  if(!t)return;
+  var cur=t.cur||'USD';
+  var dd=getDays(t),tot=tAll(t),gen=tGen(t),pd=dd.length>0?tot/dd.length:0;
+  var bg=t.color||DEF_COLOR;
+  var s1=secAmt(tot,cur),s2=secAmt(gen,cur),s3=dd.length>0?secAmt(pd,cur):'';
+
+  // General tab
+  var tabG='<div class="sec-title">General Expenses <span class="badge">'+(t.gen||[]).length+'</span></div>';
+  tabG+='<div class="gcards">';
+  Object.keys(GTYPES).forEach(function(k){
+    var g=GTYPES[k];
+    var items=(t.gen||[]).filter(function(e){return e.type===k;});
+    var sum=items.reduce(function(s,e){return s+parseFloat(e.amt||0);},0);
+    var ss=secAmt(sum,cur);
+    tabG+='<div class="gcard" data-action="open-gen" data-type="'+k+'">';
+    tabG+='<div class="gi">'+g.i+'</div><div class="gl">'+g.l+'</div>';
+    tabG+='<div class="ga">'+fmt(sum,cur)+'</div>';
+    if(ss)tabG+='<div class="gs">'+ss+'</div>';
+    tabG+='<div class="gc">'+items.length+' item'+(items.length!==1?'s':'')+'</div></div>';
+  });
+  tabG+='</div>';
+  if((t.gen||[]).length){
+    tabG+='<div class="exp-list">';
+    (t.gen||[]).forEach(function(e,i){
+      var ss=secAmt(e.amt,e.cur||cur);
+      tabG+='<div class="exp-row">';
+      tabG+='<div class="dot" style="background:'+(CCOLORS[e.type]||'#7a8fa6')+'"></div>';
+      tabG+='<div class="exp-i"><div class="exp-d">'+(GTYPES[e.type]?GTYPES[e.type].i:'📦')+' '+(e.desc||e.type)+'</div>';
+      tabG+='<div class="exp-c">'+(GTYPES[e.type]?GTYPES[e.type].l:'')+'</div></div>';
+      tabG+='<div class="exp-a"><div class="am">'+fmt(e.amt,e.cur||cur)+'</div>'+(ss?'<div class="as">'+ss+'</div>':'')+'</div>';
+      tabG+='<button class="xbtn" data-action="del-gen" data-idx="'+i+'">×</button></div>';
+    });
+    tabG+='</div>';
+  }
+  tabG+='<button class="add-gen-btn" data-action="open-gen" data-type="flight">+ Add General Expense</button>';
+
+  // Days tab
+  var tabD='';
+  if(!dd.length){
+    tabD='<p style="color:var(--muted);font-size:13px;padding:12px 0">Set trip dates to see day-by-day view.</p>';
+  } else {
+    dd.forEach(function(d,i){
+      var exps=(t.day||{})[d]||[];
+      var tot2=exps.reduce(function(s,e){return s+parseFloat(e.amt||0);},0);
+      var dn=new Date(d+'T00:00:00');
+      var ss=secAmt(tot2,cur);
+      var note=(t.notes||{})[d]||'';
+      tabD+='<div class="day-card" id="DC_'+d+'">';
+      tabD+='<div class="day-head" data-action="day-toggle" data-date="'+d+'">';
+      tabD+='<div><div class="day-lbl">Day '+(i+1)+'</div>';
+      tabD+='<div class="day-dt">'+dn.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'})+'</div></div>';
+      tabD+='<div class="day-right"><div class="day-tot"><div class="v">'+(tot2>0?fmt(tot2,cur):'—')+'</div>'+(ss&&tot2>0?'<div class="s">'+ss+'</div>':'')+'</div><div class="dchev">›</div></div></div>';
+      tabD+='<div class="day-body" id="DB_'+d+'" style="display:none">';
+      if(note){
+        tabD+='<div class="day-notes"><span class="ni">📝</span><span class="nt">'+note+'</span><button class="ne" data-action="edit-note" data-date="'+d+'" data-idx="'+i+'">✏️</button></div>';
+      } else {
+        tabD+='<button class="add-note-btn" data-action="add-note" data-date="'+d+'" data-idx="'+i+'">📝 Add notes for Day '+(i+1)+'...</button>';
+      }
+      if(!exps.length)tabD+='<p style="padding:11px 13px;color:var(--muted);font-size:12px">No expenses yet.</p>';
+      exps.forEach(function(e,ei){
+        var ss2=secAmt(e.amt,e.cur||cur);
+        tabD+='<div class="exp-row">';
+        tabD+='<div class="dot" style="background:'+(CCOLORS[e.cat]||'#7a8fa6')+'"></div>';
+        tabD+='<div class="exp-i"><div class="exp-d">'+catIcon(e.cat)+' '+(e.desc||e.cat)+'</div><div class="exp-c">'+e.cat+'</div></div>';
+        tabD+='<div class="exp-a"><div class="am">'+fmt(e.amt,e.cur||cur)+'</div>'+(ss2?'<div class="as">'+ss2+'</div>':'')+'</div>';
+        tabD+='<button class="xbtn" data-action="del-exp" data-date="'+d+'" data-idx="'+ei+'">×</button></div>';
+      });
+      tabD+='<button class="add-exp-btn" data-action="add-exp" data-date="'+d+'" data-idx="'+i+'">+ Add expense for Day '+(i+1)+'</button>';
+      tabD+='</div></div>';
+    });
+  }
+
+  // Category tab
+  var cats={};
+  (t.gen||[]).forEach(function(e){cats[e.type]=(cats[e.type]||0)+parseFloat(e.amt||0);});
+  Object.keys(t.day||{}).forEach(function(k){(t.day[k]||[]).forEach(function(e){cats[e.cat]=(cats[e.cat]||0)+parseFloat(e.amt||0);});});
+  var catTotal=Object.keys(cats).reduce(function(s,k){return s+cats[k];},0);
+  var tabC='';
+  if(!catTotal){
+    tabC='<p style="color:var(--muted);font-size:13px;padding:12px 0">No expenses yet.</p>';
+  } else {
+    var catEntries=Object.keys(cats).map(function(k){return[k,cats[k]];}).sort(function(a,b){return b[1]-a[1];});
+    catEntries.forEach(function(pair){
+      var c=pair[0],a=pair[1];
+      var pct=Math.round(a/catTotal*100);
+      var lbl=GTYPES[c]?GTYPES[c].l:(c.charAt(0).toUpperCase()+c.slice(1));
+      var ic=GTYPES[c]?GTYPES[c].i:catIcon(c);
+      var ss=secAmt(a,cur);
+      tabC+='<div class="cat-bar-row"><div class="cat-bar-top"><div class="name">'+ic+' '+lbl+'</div>';
+      tabC+='<div class="right"><div class="v">'+fmt(a,cur)+' <span style="color:var(--muted);font-size:11px">'+pct+'%</span></div>'+(ss?'<div class="s">'+ss+'</div>':'')+'</div></div>';
+      tabC+='<div class="cat-bar-bg"><div class="cat-bar-fill" style="width:'+pct+'%;background:'+(CCOLORS[c]||'#7a8fa6')+'"></div></div></div>';
+    });
+  }
+
+  var html='';
+  html+='<div style="padding:12px 14px 6px">';
+  html+='<button class="back-btn" data-action="go-home">&#8249; Trips</button>';
+  html+='<div style="display:flex;align-items:flex-start;justify-content:space-between">';
+  html+='<div style="display:flex;align-items:center;gap:10px">';
+  html+='<div style="width:44px;height:44px;border-radius:13px;background:'+bg+';display:flex;align-items:center;justify-content:center;font-size:26px;flex-shrink:0">'+t.emoji+'</div>';
+  html+='<div><div style="font-family:var(--fh);font-size:19px;font-weight:800">'+t.name+'</div>';
+  html+='<div style="font-size:11px;color:var(--muted);margin-top:3px">'+(t.start?fdate(t.start)+' to '+fdate(t.end):'No dates')+' · '+dd.length+' days'+(settings.sec?' · <span style="color:var(--green)">+'+settings.sec+'</span>':'')+'</div>';
+  if(t.desc)html+='<div style="font-size:12px;color:var(--muted);font-style:italic;margin-top:4px;line-height:1.4">'+t.desc+'</div>';
+  html+='</div></div>';
+  html+='<button class="export-btn" data-action="export">⬇ CSV</button></div></div>';
+  html+='<div style="padding:0 14px">';
+  html+='<div class="sumbar">';
+  html+='<div><div class="v">'+fmt(tot,cur)+'</div>'+(s1?'<div class="s">'+s1+'</div>':'')+'<div class="l">Total</div></div>';
+  html+='<div><div class="v">'+fmt(gen,cur)+'</div>'+(s2?'<div class="s">'+s2+'</div>':'')+'<div class="l">General</div></div>';
+  html+='<div><div class="v">'+(dd.length>0?fmt(pd,cur):'—')+'</div>'+(s3?'<div class="s">'+s3+'</div>':'')+'<div class="l">Per Day</div></div>';
+  html+='</div>';
+  html+='<div class="tabs">';
+  html+='<button class="tab on" data-action="tab" data-tab="general">General</button>';
+  html+='<button class="tab" data-action="tab" data-tab="days">Day by Day</button>';
+  html+='<button class="tab" data-action="tab" data-tab="cats">By Category</button>';
+  html+='</div>';
+  html+='<div class="tabpane on" id="TP_general">'+tabG+'</div>';
+  html+='<div class="tabpane" id="TP_days">'+tabD+'</div>';
+  html+='<div class="tabpane" id="TP_cats">'+tabC+'</div>';
+  html+='</div>';
+  document.getElementById('detail-wrap').innerHTML=html;
+}
+
+function goHome(){
+  curTripId=null;
+  document.getElementById('B_FAB').style.display='';
+  showScreen('SCR_HOME');
+  renderHome();
+}
+function goDetail(id){
+  curTripId=id;
+  document.getElementById('B_FAB').style.display='none';
+  renderDetail();
+  showScreen('SCR_DETAIL');
+}
+
+function openTripForm(id){
+  editTripId=id||null;
+  pickEmoji=EMOJIS[0];pickColor=DEF_COLOR;
+  if(id){
+    var t=getTrip(id);
+    document.getElementById('trip-form-title').textContent='Edit Trip';
+    document.getElementById('F_TNAME').value=t.name||'';
+    document.getElementById('F_TDESC').value=t.desc||'';
+    document.getElementById('F_TSTART').value=t.start||'';
+    document.getElementById('F_TEND').value=t.end||'';
+    document.getElementById('F_TCUR').value=t.cur||'USD';
+    pickEmoji=t.emoji||EMOJIS[0];pickColor=t.color||DEF_COLOR;
+  } else {
+    document.getElementById('trip-form-title').textContent='New Trip';
+    document.getElementById('F_TNAME').value='';
+    document.getElementById('F_TDESC').value='';
+    document.getElementById('F_TSTART').value='';
+    document.getElementById('F_TEND').value='';
+    document.getElementById('F_TCUR').value='USD';
+  }
+  buildPickers();updatePreview();
+  openOvl('OVL_TRIP');
+}
+function buildPickers(){
+  var eh='';
+  EMOJIS.forEach(function(e){eh+='<div class="epick'+(e===pickEmoji?' sel':'')+'" data-action="pick-emoji" data-emoji="'+e+'" style="background:'+pickColor+'">'+e+'</div>';});
+  document.getElementById('F_EMOJIS').innerHTML=eh;
+  var ch='';
+  COLORS.forEach(function(c){ch+='<div class="cpick'+(c===pickColor?' sel':'')+'" data-action="pick-color" data-color="'+c+'" style="background:'+c+'"></div>';});
+  document.getElementById('F_COLORS').innerHTML=ch;
+}
+function updatePreview(){var p=document.getElementById('F_PREV');p.style.background=pickColor;p.textContent=pickEmoji;}
+
+function saveTrip(){
+  var name=document.getElementById('F_TNAME').value.trim();
+  var desc=document.getElementById('F_TDESC').value.trim();
+  var start=document.getElementById('F_TSTART').value;
+  var end=document.getElementById('F_TEND').value;
+  var cur=document.getElementById('F_TCUR').value;
+  if(!name){toast('Enter a trip name');return;}
+  if(start&&end&&end<start){toast('End must be after start');return;}
+  if(editTripId){
+    var t=getTrip(editTripId);
+    t.name=name;t.desc=desc;t.start=start;t.end=end;t.cur=cur;t.emoji=pickEmoji;t.color=pickColor;
+  } else {
+    trips.push({id:'t'+Date.now(),name:name,desc:desc,start:start,end:end,cur:cur,emoji:pickEmoji,color:pickColor,gen:[],day:{},notes:{}});
+  }
+  save();closeOvl('OVL_TRIP');renderHome();toast('Trip saved!');
+}
+
+function openSettings(){
+  document.getElementById('F_SECCUR').value=settings.sec||'';
+  updateRateFields(settings.sec);
+  openOvl('OVL_SETTINGS');
+}
+function updateRateFields(sc){
+  var wrap=document.getElementById('RATE_SECTION');
+  if(!sc){wrap.style.display='none';return;}
+  wrap.style.display='block';
+  document.getElementById('RATE_NAME').textContent=sc;
+  var primaries={};trips.forEach(function(t){primaries[t.cur||'USD']=1;});primaries['USD']=1;
+  var html='';
+  Object.keys(primaries).forEach(function(p){
+    html+='<div class="field"><label>1 '+p+' = ? '+sc+'</label><input type="number" id="RF_'+p+'" value="'+(settings.rates[p]||'')+'" placeholder="e.g. 3.70" min="0" step="any"></div>';
+  });
+  document.getElementById('RATE_FIELDS').innerHTML=html;
+}
+function saveSettings(){
+  var sc=document.getElementById('F_SECCUR').value;
+  var rates={};
+  if(sc){
+    var primaries={};trips.forEach(function(t){primaries[t.cur||'USD']=1;});primaries['USD']=1;
+    Object.keys(primaries).forEach(function(p){var el=document.getElementById('RF_'+p);var v=el?parseFloat(el.value||0):0;if(v>0)rates[p]=v;});
+  }
+  settings={sec:sc,rates:rates};
+  save();closeOvl('OVL_SETTINGS');renderHome();toast(sc?'Currency set!':'Secondary currency off');
+}
+
+function openGenForm(type){
+  var t=getTrip(curTripId);
+  document.getElementById('F_GTYPE').value=type||'flight';
+  document.getElementById('F_GDESC').value='';
+  document.getElementById('F_GAMT').value='';
+  document.getElementById('F_GCUR').value=t.cur||'USD';
+  openOvl('OVL_GEN');
+}
+function saveGen(){
+  var type=document.getElementById('F_GTYPE').value;
+  var desc=document.getElementById('F_GDESC').value.trim();
+  var amt=parseFloat(document.getElementById('F_GAMT').value);
+  var cur=document.getElementById('F_GCUR').value;
+  if(!amt||amt<=0){toast('Enter a valid amount');return;}
+  var t=getTrip(curTripId);
+  if(!t.gen)t.gen=[];
+  t.gen.push({type:type,desc:desc,amt:amt,cur:cur});
+  save();closeOvl('OVL_GEN');renderDetail();toast('Added!');
+}
+function delGen(i){var t=getTrip(curTripId);t.gen.splice(i,1);save();renderDetail();toast('Deleted');}
+
+function openExpForm(date,idx){
+  curDay=date;
+  var t=getTrip(curTripId);
+  var dn=new Date(date+'T00:00:00');
+  document.getElementById('EXP_TITLE').textContent='Day '+(idx+1)+' — '+dn.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
+  document.getElementById('F_ECAT').value='food';
+  document.getElementById('F_EDESC').value='';
+  document.getElementById('F_EAMT').value='';
+  document.getElementById('F_ECUR').value=t.cur||'USD';
+  openOvl('OVL_EXP');
+}
+function saveExp(){
+  var cat=document.getElementById('F_ECAT').value;
+  var desc=document.getElementById('F_EDESC').value.trim();
+  var amt=parseFloat(document.getElementById('F_EAMT').value);
+  var cur=document.getElementById('F_ECUR').value;
+  if(!amt||amt<=0){toast('Enter a valid amount');return;}
+  var t=getTrip(curTripId);
+  if(!t.day)t.day={};
+  if(!t.day[curDay])t.day[curDay]=[];
+  t.day[curDay].push({cat:cat,desc:desc,amt:amt,cur:cur});
+  save();closeOvl('OVL_EXP');renderDetail();toast('Added!');
+}
+function delExp(date,i){var t=getTrip(curTripId);t.day[date].splice(i,1);save();renderDetail();toast('Deleted');}
+
+function openNoteForm(date,idx){
+  curDay=date;
+  var t=getTrip(curTripId);
+  var dn=new Date(date+'T00:00:00');
+  document.getElementById('NOTES_TITLE').textContent='Day '+(idx+1)+' — '+dn.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
+  document.getElementById('F_NOTES').value=(t.notes||{})[date]||'';
+  openOvl('OVL_NOTES');
+}
+function saveNotes(){
+  var note=document.getElementById('F_NOTES').value.trim();
+  var t=getTrip(curTripId);
+  if(!t.notes)t.notes={};
+  if(note)t.notes[curDay]=note; else delete t.notes[curDay];
+  save();closeOvl('OVL_NOTES');renderDetail();toast(note?'Notes saved!':'Notes cleared');
+}
+
+function exportCSV(id){
+  var t=getTrip(id),cur=t.cur||'USD',sc=settings.sec;
+  var hdrs=['Date','Type','Category','Description','Amount','Currency'];
+  if(sc)hdrs.push(sc+' approx');
+  var rows=[hdrs];
+  (t.gen||[]).forEach(function(e){
+    var r=[t.start||'','General',GTYPES[e.type]?GTYPES[e.type].l:e.type,e.desc||'',e.amt,e.cur||cur];
+    if(sc){var rt=parseFloat(settings.rates[e.cur||cur]||0);r.push(rt?(e.amt*rt).toFixed(2):'');}
+    rows.push(r);
+  });
+  getDays(t).forEach(function(d,i){
+    var note=(t.notes||{})[d];
+    if(note){var r=[d,'Day '+(i+1),'Notes',note,'',''];if(sc)r.push('');rows.push(r);}
+    ((t.day||{})[d]||[]).forEach(function(e){
+      var r=[d,'Day '+(i+1),e.cat,e.desc||'',e.amt,e.cur||cur];
+      if(sc){var rt=parseFloat(settings.rates[e.cur||cur]||0);r.push(rt?(e.amt*rt).toFixed(2):'');}
+      rows.push(r);
+    });
+  });
+  var csv=rows.map(function(r){return r.map(function(c){return'"'+c+'"';}).join(',');}).join('\n');
+  var a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
+  a.download=t.name.replace(/\s+/g,'_')+'_expenses.csv';
+  a.click();toast('CSV downloaded!');
+}
+
+// Single event handler for everything
+document.addEventListener('click',function(e){
+  var el=e.target;
+  // Walk up max 4 levels to find actionable element
+  for(var i=0;i<4;i++){
+    if(!el||el===document.body)break;
+    var a=el.dataset?el.dataset.action:null;
+    var eid=el.id||'';
+
+    // Static button IDs
+    if(eid==='B_NEW_TRIP'||eid==='B_FAB'){openTripForm();return;}
+    if(eid==='B_SETTINGS'){openSettings();return;}
+    if(eid==='B_TRIP_CANCEL'){closeOvl('OVL_TRIP');return;}
+    if(eid==='B_TRIP_SAVE'){saveTrip();return;}
+    if(eid==='B_SET_CANCEL'){closeOvl('OVL_SETTINGS');return;}
+    if(eid==='B_SET_SAVE'){saveSettings();return;}
+    if(eid==='B_GEN_CANCEL'){closeOvl('OVL_GEN');return;}
+    if(eid==='B_GEN_SAVE'){saveGen();return;}
+    if(eid==='B_EXP_CANCEL'){closeOvl('OVL_EXP');return;}
+    if(eid==='B_EXP_SAVE'){saveExp();return;}
+    if(eid==='B_NOTES_CANCEL'){closeOvl('OVL_NOTES');return;}
+    if(eid==='B_NOTES_SAVE'){saveNotes();return;}
+
+    // Data-action attributes
+    if(a==='toggle'){
+      var card=document.querySelector('.trip-card[data-id="'+el.dataset.id+'"]');
+      if(card)card.classList.toggle('open');
+      return;
+    }
+    if(a==='detail'){goDetail(el.dataset.id);return;}
+    if(a==='edit'){openTripForm(el.dataset.id);return;}
+    if(a==='del'){if(confirm('Delete this trip?')){trips=trips.filter(function(t){return t.id!==el.dataset.id;});save();renderHome();toast('Deleted');}return;}
+    if(a==='go-home'){goHome();return;}
+    if(a==='export'){exportCSV(curTripId);return;}
+    if(a==='tab'){
+      document.querySelectorAll('.tab').forEach(function(t){t.classList.remove('on');});
+      document.querySelectorAll('.tabpane').forEach(function(t){t.classList.remove('on');});
+      el.classList.add('on');
+      var tp=document.getElementById('TP_'+el.dataset.tab);
+      if(tp)tp.classList.add('on');
+      return;
+    }
+    if(a==='open-gen'){openGenForm(el.dataset.type);return;}
+    if(a==='del-gen'){delGen(parseInt(el.dataset.idx));return;}
+    if(a==='day-toggle'){
+      var dc=document.getElementById('DC_'+el.dataset.date);
+      var db=document.getElementById('DB_'+el.dataset.date);
+      if(dc&&db){dc.classList.toggle('open');db.style.display=dc.classList.contains('open')?'block':'none';}
+      return;
+    }
+    if(a==='add-exp'){openExpForm(el.dataset.date,parseInt(el.dataset.idx));return;}
+    if(a==='del-exp'){delExp(el.dataset.date,parseInt(el.dataset.idx));return;}
+    if(a==='add-note'||a==='edit-note'){openNoteForm(el.dataset.date,parseInt(el.dataset.idx));return;}
+    if(a==='pick-emoji'){pickEmoji=el.dataset.emoji;document.querySelectorAll('.epick').forEach(function(e){e.classList.remove('sel');});el.classList.add('sel');updatePreview();return;}
+    if(a==='pick-color'){
+      pickColor=el.dataset.color;
+      document.querySelectorAll('.cpick').forEach(function(e){e.classList.remove('sel');});
+      el.classList.add('sel');
+      document.querySelectorAll('.epick').forEach(function(e){e.style.background=pickColor;});
+      updatePreview();return;
+    }
+
+    // Overlay backdrop close
+    if(el.classList&&el.classList.contains('overlay')&&e.target===el){el.classList.remove('on');return;}
+
+    el=el.parentElement;
+  }
+});
+
+// Settings currency select
+document.getElementById('F_SECCUR').addEventListener('change',function(){updateRateFields(this.value);});
+
+load();
+renderHome();
+</script>
+</body>
+</html>
