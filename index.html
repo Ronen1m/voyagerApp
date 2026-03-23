@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Voyager Expenses</title>
+<title>Voyager Expenses v3</title>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@400;500&display=swap" rel="stylesheet">
 <style>
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
@@ -177,13 +177,7 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(.5)}
       <div class="field"><label>End Date</label><input id="F_TEND" type="date"></div>
     </div>
     <div class="field"><label>Currency</label>
-      <select id="F_TCUR">
-        <option value="USD">$ USD</option><option value="EUR">€ EUR</option><option value="GBP">£ GBP</option>
-        <option value="ILS">₪ ILS</option><option value="JPY">¥ JPY</option><option value="AUD">A$ AUD</option>
-        <option value="CAD">C$ CAD</option><option value="CHF">CHF</option><option value="MXN">MX$ MXN</option>
-        <option value="INR">₹ INR</option><option value="AED">AED</option><option value="THB">฿ THB</option>
-        <option value="SGD">S$ SGD</option><option value="TRY">₺ TRY</option><option value="PLN">zł PLN</option>
-      </select>
+      <select id="F_TCUR"></select>
     </div>
     <div class="btn2">
       <button class="cancel" id="B_TRIP_CANCEL">Cancel</button>
@@ -197,14 +191,7 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(.5)}
     <div class="handle"></div>
     <h2>Settings</h2>
     <div class="field"><label>Secondary Currency</label>
-      <select id="F_SECCUR">
-        <option value="">— Disabled —</option>
-        <option value="USD">$ USD</option><option value="EUR">€ EUR</option><option value="GBP">£ GBP</option>
-        <option value="ILS">₪ ILS</option><option value="JPY">¥ JPY</option><option value="AUD">A$ AUD</option>
-        <option value="CAD">C$ CAD</option><option value="CHF">CHF</option><option value="MXN">MX$ MXN</option>
-        <option value="INR">₹ INR</option><option value="AED">AED</option><option value="THB">฿ THB</option>
-        <option value="SGD">S$ SGD</option><option value="TRY">₺ TRY</option><option value="PLN">zł PLN</option>
-      </select>
+      <select id="F_SECCUR"></select>
     </div>
     <div id="RATE_SECTION" style="display:none">
       <div class="rate-note">💱 1 primary = how many <strong id="RATE_NAME"></strong></div>
@@ -231,9 +218,7 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(.5)}
     <div class="field"><label>Description</label><input id="F_GDESC" type="text" placeholder="e.g. Flight TLV to JFK"></div>
     <div class="crow">
       <div class="field"><label>Currency</label>
-        <select id="F_GCUR">
-          <option value="USD">$ USD</option><option value="EUR">€ EUR</option><option value="GBP">£ GBP</option><option value="ILS">₪ ILS</option><option value="JPY">¥ JPY</option><option value="AUD">A$ AUD</option><option value="CAD">C$ CAD</option><option value="CHF">CHF</option><option value="MXN">MX$ MXN</option><option value="INR">₹ INR</option><option value="AED">AED</option><option value="THB">฿ THB</option><option value="SGD">S$ SGD</option><option value="TRY">₺ TRY</option><option value="PLN">zł PLN</option>
-        </select>
+        <select id="F_GCUR"></select>
       </div>
       <div class="field"><label>Amount</label><input id="F_GAMT" type="number" placeholder="0.00" min="0" step="0.01"></div>
     </div>
@@ -258,9 +243,7 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(.5)}
     <div class="field"><label>Description</label><input id="F_EDESC" type="text" placeholder="e.g. Lunch at restaurant"></div>
     <div class="crow">
       <div class="field"><label>Currency</label>
-        <select id="F_ECUR">
-          <option value="USD">$ USD</option><option value="EUR">€ EUR</option><option value="GBP">£ GBP</option><option value="ILS">₪ ILS</option><option value="JPY">¥ JPY</option><option value="AUD">A$ AUD</option><option value="CAD">C$ CAD</option><option value="CHF">CHF</option><option value="MXN">MX$ MXN</option><option value="INR">₹ INR</option><option value="AED">AED</option><option value="THB">฿ THB</option><option value="SGD">S$ SGD</option><option value="TRY">₺ TRY</option><option value="PLN">zł PLN</option>
-        </select>
+        <select id="F_ECUR"></select>
       </div>
       <div class="field"><label>Amount</label><input id="F_EAMT" type="number" placeholder="0.00" min="0" step="0.01"></div>
     </div>
@@ -291,6 +274,29 @@ var COLORS=['#f0a500','#e05c2a','#2dd4a0','#3b82f6','#7c6fcd','#f05252','#10b981
 var GTYPES={flight:{i:'✈️',l:'Flights'},hotel:{i:'🏨',l:'Hotels'},gas:{i:'⛽',l:'Gas'},car:{i:'🚗',l:'Car Rental'},insurance:{i:'🛡️',l:'Insurance'},visa:{i:'📋',l:'Visa/Entry'}};
 var CCOLORS={food:'#f0a500',transport:'#2dd4a0',hotel:'#7c6fcd',activities:'#e05c2a',shopping:'#f05252',other:'#7a8fa6',flight:'#3b82f6',gas:'#2dd4a0',car:'#06b6d4',insurance:'#8b5cf6',visa:'#ec4899'};
 var SYMS={USD:'$',EUR:'€',GBP:'£',ILS:'₪',JPY:'¥',AUD:'A$',CAD:'C$',CHF:'CHF',MXN:'MX$',INR:'₹',AED:'AED',THB:'฿',SGD:'S$',TRY:'₺',PLN:'zł'};
+var CURRENCIES=[
+  {v:'USD',l:'$ USD'},{v:'EUR',l:'€ EUR'},{v:'GBP',l:'£ GBP'},
+  {v:'ILS',l:'₪ ILS'},{v:'JPY',l:'¥ JPY'},{v:'AUD',l:'A$ AUD'},
+  {v:'CAD',l:'C$ CAD'},{v:'CHF',l:'CHF'},{v:'MXN',l:'MX$ MXN'},
+  {v:'INR',l:'₹ INR'},{v:'AED',l:'AED'},{v:'THB',l:'฿ THB'},
+  {v:'SGD',l:'S$ SGD'},{v:'TRY',l:'₺ TRY'},{v:'PLN',l:'zł PLN'}
+];
+function fillCurSelect(id,selected){
+  var el=document.getElementById(id);
+  if(!el)return;
+  el.innerHTML=CURRENCIES.map(function(c){
+    return '<option value="'+c.v+'"'+(c.v===selected?' selected':'')+'>'+c.l+'</option>';
+  }).join('');
+}
+function fillSecSelect(id,selected){
+  var el=document.getElementById(id);
+  if(!el)return;
+  var opts='<option value=""'+(selected?'':' selected')+'>— Disabled —</option>';
+  opts+=CURRENCIES.map(function(c){
+    return '<option value="'+c.v+'"'+(c.v===selected?' selected':'')+'>'+c.l+'</option>';
+  }).join('');
+  el.innerHTML=opts;
+}
 var DEF_COLOR='#3b82f6';
 
 var _mem={};
@@ -298,7 +304,7 @@ function sGet(k){try{return localStorage.getItem(k);}catch(e){return _mem[k]||nu
 function sSet(k,v){try{localStorage.setItem(k,v);}catch(e){_mem[k]=v;}}
 
 var trips=[],settings={sec:"",rates:{}};var sortAsc=false;
-var curTripId=null,editTripId=null,curDay=null;
+var curTripId=null,editTripId=null,curDay=null,editGenIdx=-1,editExpIdx=-1;
 var pickEmoji=EMOJIS[0],pickColor=DEF_COLOR;
 
 function load(){
@@ -398,6 +404,7 @@ function renderDetail(){
       tabG+='<div class="exp-i"><div class="exp-d">'+(GTYPES[e.type]?GTYPES[e.type].i:'📦')+' '+(e.desc||e.type)+'</div>';
       tabG+='<div class="exp-c">'+(GTYPES[e.type]?GTYPES[e.type].l:'')+'</div></div>';
       tabG+='<div class="exp-a"><div class="am">'+fmt(e.amt,e.cur||cur)+'</div>'+(ss?'<div class="as">'+ss+'</div>':'')+'</div>';
+      tabG+='<button class="xbtn" data-action="edit-gen" data-idx="'+i+'" style="color:var(--muted);font-size:15px">✏️</button>';
       tabG+='<button class="xbtn" data-action="del-gen" data-idx="'+i+'">×</button></div>';
     });
     tabG+='</div>';
@@ -433,6 +440,7 @@ function renderDetail(){
         tabD+='<div class="dot" style="background:'+(CCOLORS[e.cat]||'#7a8fa6')+'"></div>';
         tabD+='<div class="exp-i"><div class="exp-d">'+catIcon(e.cat)+' '+(e.desc||e.cat)+'</div><div class="exp-c">'+e.cat+'</div></div>';
         tabD+='<div class="exp-a"><div class="am">'+fmt(e.amt,e.cur||cur)+'</div>'+(ss2?'<div class="as">'+ss2+'</div>':'')+'</div>';
+        tabD+='<button class="xbtn" data-action="edit-exp" data-date="'+d+'" data-idx="'+ei+'" data-dayidx="'+i+'" style="color:var(--muted);font-size:15px">✏️</button>';
         tabD+='<button class="xbtn" data-action="del-exp" data-date="'+d+'" data-idx="'+ei+'">×</button></div>';
       });
       tabD+='<button class="add-exp-btn" data-action="add-exp" data-date="'+d+'" data-idx="'+i+'">+ Add expense for Day '+(i+1)+'</button>';
@@ -514,7 +522,7 @@ function openTripForm(id){
     document.getElementById('F_TDESC').value=t.desc||'';
     document.getElementById('F_TSTART').value=t.start||'';
     document.getElementById('F_TEND').value=t.end||'';
-    document.getElementById('F_TCUR').value=t.cur||'USD';
+    fillCurSelect('F_TCUR',t.cur||'USD');
     pickEmoji=t.emoji||EMOJIS[0];pickColor=t.color||DEF_COLOR;
   } else {
     document.getElementById('trip-form-title').textContent='New Trip';
@@ -522,7 +530,7 @@ function openTripForm(id){
     document.getElementById('F_TDESC').value='';
     document.getElementById('F_TSTART').value='';
     document.getElementById('F_TEND').value='';
-    document.getElementById('F_TCUR').value='USD';
+    fillCurSelect('F_TCUR','USD');
   }
   buildPickers();updatePreview();
   openOvl('OVL_TRIP');
@@ -555,7 +563,7 @@ function saveTrip(){
 }
 
 function openSettings(){
-  document.getElementById('F_SECCUR').value=settings.sec||'';
+  fillSecSelect('F_SECCUR',settings.sec||'');
   updateRateFields(settings.sec);
   openOvl('OVL_SETTINGS');
 }
@@ -582,12 +590,25 @@ function saveSettings(){
   save();closeOvl('OVL_SETTINGS');renderHome();toast(sc?'Currency set!':'Secondary currency off');
 }
 
-function openGenForm(type){
+function openGenForm(type,editIdx){
   var t=getTrip(curTripId);
-  document.getElementById('F_GTYPE').value=type||'flight';
-  document.getElementById('F_GDESC').value='';
-  document.getElementById('F_GAMT').value='';
-  document.getElementById('F_GCUR').value=t.cur||'USD';
+  editGenIdx=(editIdx!==undefined)?editIdx:-1;
+  if(editIdx>=0){
+    var e=t.gen[editIdx];
+    document.getElementById('F_GTYPE').value=e.type||'flight';
+    document.getElementById('F_GDESC').value=e.desc||'';
+    document.getElementById('F_GAMT').value=e.amt||'';
+    fillCurSelect('F_GCUR',e.cur||t.cur||'USD');
+    document.querySelector('#OVL_GEN h2').textContent='Edit Expense';
+    document.getElementById('B_GEN_SAVE').textContent='Save Changes';
+  } else {
+    document.getElementById('F_GTYPE').value=type||'flight';
+    document.getElementById('F_GDESC').value='';
+    document.getElementById('F_GAMT').value='';
+    fillCurSelect('F_GCUR',t.cur||'USD');
+    document.querySelector('#OVL_GEN h2').textContent='Add General Expense';
+    document.getElementById('B_GEN_SAVE').textContent='Add';
+  }
   openOvl('OVL_GEN');
 }
 function saveGen(){
@@ -598,20 +619,39 @@ function saveGen(){
   if(!amt||amt<=0){toast('Enter a valid amount');return;}
   var t=getTrip(curTripId);
   if(!t.gen)t.gen=[];
-  t.gen.push({type:type,desc:desc,amt:amt,cur:cur});
-  save();closeOvl('OVL_GEN');renderDetail();toast('Added!');
+  if(editGenIdx>=0){
+    t.gen[editGenIdx]={type:type,desc:desc,amt:amt,cur:cur};
+    toast('Updated!');
+  } else {
+    t.gen.push({type:type,desc:desc,amt:amt,cur:cur});
+    toast('Added!');
+  }
+  save();closeOvl('OVL_GEN');renderDetail();
 }
 function delGen(i){var t=getTrip(curTripId);t.gen.splice(i,1);save();renderDetail();toast('Deleted');}
 
-function openExpForm(date,idx){
+function openExpForm(date,idx,editIdx){
   curDay=date;
   var t=getTrip(curTripId);
   var dn=new Date(date+'T00:00:00');
-  document.getElementById('EXP_TITLE').textContent='Day '+(idx+1)+' — '+dn.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
-  document.getElementById('F_ECAT').value='food';
-  document.getElementById('F_EDESC').value='';
-  document.getElementById('F_EAMT').value='';
-  document.getElementById('F_ECUR').value=t.cur||'USD';
+  var dayLabel='Day '+(idx+1)+' — '+dn.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
+  editExpIdx=(editIdx!==undefined)?editIdx:-1;
+  if(editIdx>=0){
+    var e=(t.day[date]||[])[editIdx];
+    document.getElementById('EXP_TITLE').textContent='Edit — '+dayLabel;
+    document.getElementById('F_ECAT').value=e.cat||'food';
+    document.getElementById('F_EDESC').value=e.desc||'';
+    document.getElementById('F_EAMT').value=e.amt||'';
+    fillCurSelect('F_ECUR',e.cur||t.cur||'USD');
+    document.getElementById('B_EXP_SAVE').textContent='Save Changes';
+  } else {
+    document.getElementById('EXP_TITLE').textContent=dayLabel;
+    document.getElementById('F_ECAT').value='food';
+    document.getElementById('F_EDESC').value='';
+    document.getElementById('F_EAMT').value='';
+    fillCurSelect('F_ECUR',t.cur||'USD');
+    document.getElementById('B_EXP_SAVE').textContent='Add Expense';
+  }
   openOvl('OVL_EXP');
 }
 function saveExp(){
@@ -623,8 +663,14 @@ function saveExp(){
   var t=getTrip(curTripId);
   if(!t.day)t.day={};
   if(!t.day[curDay])t.day[curDay]=[];
-  t.day[curDay].push({cat:cat,desc:desc,amt:amt,cur:cur});
-  save();closeOvl('OVL_EXP');renderDetail();toast('Added!');
+  if(editExpIdx>=0){
+    t.day[curDay][editExpIdx]={cat:cat,desc:desc,amt:amt,cur:cur};
+    toast('Updated!');
+  } else {
+    t.day[curDay].push({cat:cat,desc:desc,amt:amt,cur:cur});
+    toast('Added!');
+  }
+  save();closeOvl('OVL_EXP');renderDetail();
 }
 function delExp(date,i){var t=getTrip(curTripId);t.day[date].splice(i,1);save();renderDetail();toast('Deleted');}
 
@@ -714,6 +760,7 @@ document.addEventListener('click',function(e){
       return;
     }
     if(a==='open-gen'){openGenForm(el.dataset.type);return;}
+    if(a==='edit-gen'){openGenForm(null,parseInt(el.dataset.idx));return;}
     if(a==='del-gen'){delGen(parseInt(el.dataset.idx));return;}
     if(a==='day-toggle'){
       var dc=document.getElementById('DC_'+el.dataset.date);
@@ -722,6 +769,7 @@ document.addEventListener('click',function(e){
       return;
     }
     if(a==='add-exp'){openExpForm(el.dataset.date,parseInt(el.dataset.idx));return;}
+    if(a==='edit-exp'){openExpForm(el.dataset.date,parseInt(el.dataset.dayidx||0),parseInt(el.dataset.idx));return;}
     if(a==='del-exp'){delExp(el.dataset.date,parseInt(el.dataset.idx));return;}
     if(a==='add-note'||a==='edit-note'){openNoteForm(el.dataset.date,parseInt(el.dataset.idx));return;}
     if(a==='pick-emoji'){pickEmoji=el.dataset.emoji;document.querySelectorAll('.epick').forEach(function(e){e.classList.remove('sel');});el.classList.add('sel');updatePreview();return;}
@@ -744,6 +792,10 @@ document.addEventListener('click',function(e){
 document.getElementById('F_SECCUR').addEventListener('change',function(){updateRateFields(this.value);});
 
 load();
+fillCurSelect('F_TCUR','USD');
+fillCurSelect('F_GCUR','USD');
+fillCurSelect('F_ECUR','USD');
+fillSecSelect('F_SECCUR',settings.sec||'');
 renderHome();
 </script>
 </body>
