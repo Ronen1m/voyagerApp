@@ -216,6 +216,10 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(.5)}
       </select>
     </div>
     <div class="field"><label>Description</label><input id="F_GDESC" type="text" placeholder="e.g. Flight TLV to JFK"></div>
+    <div class="frow" id="F_DATES_ROW" style="display:none">
+      <div class="field"><label>From Date</label><input id="F_GDATE_FROM" type="date"></div>
+      <div class="field"><label>To Date</label><input id="F_GDATE_TO" type="date"></div>
+    </div>
     <div class="crow">
       <div class="field"><label>Currency</label>
         <select id="F_GCUR"></select>
@@ -273,6 +277,11 @@ var EMOJIS=['✈️','🌍','🏖️','🏔️','🗼','🌸','🎡','🏝️','
 var COLORS=['#f0a500','#e05c2a','#2dd4a0','#3b82f6','#7c6fcd','#f05252','#10b981','#ec4899','#0891b2','#f97316','#1e3a5f','#4a1942','#064e3b','#374151','#f8fafc','#fef3c7'];
 var GTYPES={flight:{i:'✈️',l:'Flights'},hotel:{i:'🏨',l:'Hotels'},gas:{i:'⛽',l:'Gas'},car:{i:'🚗',l:'Car Rental'},insurance:{i:'🛡️',l:'Insurance'},visa:{i:'📋',l:'Visa/Entry'}};
 var CCOLORS={food:'#f0a500',transport:'#2dd4a0',hotel:'#7c6fcd',activities:'#e05c2a',shopping:'#f05252',other:'#7a8fa6',flight:'#3b82f6',gas:'#2dd4a0',car:'#06b6d4',insurance:'#8b5cf6',visa:'#ec4899'};
+function toggleGenDates(){
+  var type=document.getElementById('F_GTYPE').value;
+  var show=(type==='flight'||type==='hotel'||type==='car');
+  document.getElementById('F_DATES_ROW').style.display=show?'grid':'none';
+}
 var SYMS={USD:'$',EUR:'€',GBP:'£',ILS:'₪',JPY:'¥',AUD:'A$',CAD:'C$',CHF:'CHF',MXN:'MX$',INR:'₹',AED:'AED',THB:'฿',SGD:'S$',TRY:'₺',PLN:'zł'};
 var CURRENCIES=[
   {v:'USD',l:'$ USD'},{v:'EUR',l:'€ EUR'},{v:'GBP',l:'£ GBP'},
@@ -402,7 +411,8 @@ function renderDetail(){
       tabG+='<div class="exp-row">';
       tabG+='<div class="dot" style="background:'+(CCOLORS[e.type]||'#7a8fa6')+'"></div>';
       tabG+='<div class="exp-i"><div class="exp-d">'+(GTYPES[e.type]?GTYPES[e.type].i:'📦')+' '+(e.desc||e.type)+'</div>';
-      tabG+='<div class="exp-c">'+(GTYPES[e.type]?GTYPES[e.type].l:'')+'</div></div>';
+      var dateLine=(e.dateFrom||e.dateTo)?((e.dateFrom?fdate(e.dateFrom):'?')+' → '+(e.dateTo?fdate(e.dateTo):'?')):'';
+      tabG+='<div class="exp-c">'+(GTYPES[e.type]?GTYPES[e.type].l:'')+(dateLine?' · '+dateLine:'')+'</div></div>';
       tabG+='<div class="exp-a"><div class="am">'+fmt(e.amt,e.cur||cur)+'</div>'+(ss?'<div class="as">'+ss+'</div>':'')+'</div>';
       tabG+='<button class="xbtn" data-action="edit-gen" data-idx="'+i+'" style="color:var(--muted);font-size:15px">✏️</button>';
       tabG+='<button class="xbtn" data-action="del-gen" data-idx="'+i+'">×</button></div>';
@@ -598,6 +608,8 @@ function openGenForm(type,editIdx){
     document.getElementById('F_GTYPE').value=e.type||'flight';
     document.getElementById('F_GDESC').value=e.desc||'';
     document.getElementById('F_GAMT').value=e.amt||'';
+    document.getElementById('F_GDATE_FROM').value=e.dateFrom||'';
+    document.getElementById('F_GDATE_TO').value=e.dateTo||'';
     fillCurSelect('F_GCUR',e.cur||t.cur||'USD');
     document.querySelector('#OVL_GEN h2').textContent='Edit Expense';
     document.getElementById('B_GEN_SAVE').textContent='Save Changes';
@@ -605,10 +617,13 @@ function openGenForm(type,editIdx){
     document.getElementById('F_GTYPE').value=type||'flight';
     document.getElementById('F_GDESC').value='';
     document.getElementById('F_GAMT').value='';
+    document.getElementById('F_GDATE_FROM').value='';
+    document.getElementById('F_GDATE_TO').value='';
     fillCurSelect('F_GCUR',t.cur||'USD');
     document.querySelector('#OVL_GEN h2').textContent='Add General Expense';
     document.getElementById('B_GEN_SAVE').textContent='Add';
   }
+  toggleGenDates();
   openOvl('OVL_GEN');
 }
 function saveGen(){
@@ -616,14 +631,19 @@ function saveGen(){
   var desc=document.getElementById('F_GDESC').value.trim();
   var amt=parseFloat(document.getElementById('F_GAMT').value);
   var cur=document.getElementById('F_GCUR').value;
+  var dateFrom=document.getElementById('F_GDATE_FROM').value;
+  var dateTo=document.getElementById('F_GDATE_TO').value;
   if(!amt||amt<=0){toast('Enter a valid amount');return;}
   var t=getTrip(curTripId);
   if(!t.gen)t.gen=[];
+  var entry={type:type,desc:desc,amt:amt,cur:cur};
+  if(dateFrom)entry.dateFrom=dateFrom;
+  if(dateTo)entry.dateTo=dateTo;
   if(editGenIdx>=0){
-    t.gen[editGenIdx]={type:type,desc:desc,amt:amt,cur:cur};
+    t.gen[editGenIdx]=entry;
     toast('Updated!');
   } else {
-    t.gen.push({type:type,desc:desc,amt:amt,cur:cur});
+    t.gen.push(entry);
     toast('Added!');
   }
   save();closeOvl('OVL_GEN');renderDetail();
@@ -790,6 +810,7 @@ document.addEventListener('click',function(e){
 
 // Settings currency select
 document.getElementById('F_SECCUR').addEventListener('change',function(){updateRateFields(this.value);});
+document.getElementById('F_GTYPE').addEventListener('change',toggleGenDates);
 
 load();
 fillCurSelect('F_TCUR','USD');
