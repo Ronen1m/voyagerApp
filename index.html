@@ -433,7 +433,11 @@ function renderDetail(){
       tabG+='<div class="exp-i"><div class="exp-d">'+(GTYPES[e.type]?GTYPES[e.type].i:'📦')+' '+(e.desc||e.type)+'</div>';
       var dateLine=(e.dateFrom||e.dateTo)?((e.dateFrom?fdate(e.dateFrom):'?')+' → '+(e.dateTo?fdate(e.dateTo):'?')):'';
       tabG+='<div class="exp-c">'+(GTYPES[e.type]?GTYPES[e.type].l:'')+(dateLine?' · '+dateLine:'')+'</div></div>';
-      tabG+='<div class="exp-a"><div class="am">'+fmt(e.amt,e.cur||cur)+'</div>'+(ss?'<div class="as">'+ss+'</div>':'')+'</div>';
+      var eCur=e.cur||cur;
+      var eConverted=convertToTrip(e.amt,eCur,cur);
+      var eOriginal=(eCur!==cur)?('<div class="as">'+fmt(e.amt,eCur)+'</div>'):'';
+      var eSec=secAmt(eConverted,cur);
+      tabG+='<div class="exp-a"><div class="am">'+fmt(eConverted,cur)+'</div>'+eOriginal+(eSec&&!eOriginal?'<div class="as">'+eSec+'</div>':'')+'</div>';
       tabG+='<button class="xbtn" data-action="edit-gen" data-idx="'+i+'" style="color:var(--muted);font-size:15px">✏️</button>';
       tabG+='<button class="xbtn" data-action="del-gen" data-idx="'+i+'">×</button></div>';
     });
