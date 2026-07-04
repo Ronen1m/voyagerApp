@@ -216,6 +216,8 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(.5)}
         <option value="flight">✈️ Flight</option><option value="hotel">🏨 Hotel</option>
         <option value="gas">⛽ Gas / Transport</option><option value="car">🚗 Car Rental</option>
         <option value="insurance">🛡️ Insurance</option><option value="visa">📋 Visa / Entry</option>
+        <option value="attractions">🎟️ Attractions</option><option value="groceries">🛒 Food/Groceries</option>
+        <option value="restaurant">🍽️ Restaurants</option>
       </select>
     </div>
     <div class="field"><label>Description</label><input id="F_GDESC" type="text" placeholder="e.g. Flight TLV to JFK"></div>
@@ -278,8 +280,8 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(.5)}
 <script>
 var EMOJIS=['✈️','🌍','🏖️','🏔️','🗼','🌸','🎡','🏝️','🌮','🍕','🎭','🚂','🛳️','🏕️','🌅','🎪','🎿','🏄','🗽','🌴','🦁','🐬','🎨','🍜','🍷','🏯'];
 var COLORS=['#f0a500','#e05c2a','#2dd4a0','#3b82f6','#7c6fcd','#f05252','#10b981','#ec4899','#0891b2','#f97316','#1e3a5f','#4a1942','#064e3b','#374151','#f8fafc','#fef3c7'];
-var GTYPES={flight:{i:'✈️',l:'Flights'},hotel:{i:'🏨',l:'Hotels'},gas:{i:'⛽',l:'Gas'},car:{i:'🚗',l:'Car Rental'},insurance:{i:'🛡️',l:'Insurance'},visa:{i:'📋',l:'Visa/Entry'}};
-var CCOLORS={food:'#f0a500',transport:'#2dd4a0',hotel:'#7c6fcd',activities:'#e05c2a',shopping:'#f05252',other:'#7a8fa6',flight:'#3b82f6',gas:'#2dd4a0',car:'#06b6d4',insurance:'#8b5cf6',visa:'#ec4899'};
+var GTYPES={flight:{i:'✈️',l:'Flights'},hotel:{i:'🏨',l:'Hotels'},gas:{i:'⛽',l:'Gas'},car:{i:'🚗',l:'Car Rental'},insurance:{i:'🛡️',l:'Insurance'},visa:{i:'📋',l:'Visa/Entry'},attractions:{i:'🎟️',l:'Attractions'},groceries:{i:'🛒',l:'Food/Groceries'},restaurant:{i:'🍽️',l:'Restaurants'}};
+var CCOLORS={food:'#f0a500',transport:'#2dd4a0',hotel:'#7c6fcd',activities:'#e05c2a',shopping:'#f05252',other:'#7a8fa6',flight:'#3b82f6',gas:'#2dd4a0',car:'#06b6d4',insurance:'#8b5cf6',visa:'#ec4899',attractions:'#f97316',groceries:'#84cc16',restaurant:'#f0a500'};
 function toggleGenDates(){
   var type=document.getElementById('F_GTYPE').value;
   var show=(type==='flight'||type==='hotel'||type==='car');
@@ -340,8 +342,23 @@ function getDays(t){
   for(var d=new Date(s);d<=e;d.setDate(d.getDate()+1))a.push(new Date(d).toISOString().slice(0,10));
   return a;
 }
-function tGen(t){return(t.gen||[]).reduce(function(s,e){return s+parseFloat(e.amt||0);},0);}
-function tDay(t){var s=0;var dv=t.day||{};Object.keys(dv).forEach(function(k){dv[k].forEach(function(e){s+=parseFloat(e.amt||0);});});return s;}
+function convertToTrip(amt,fromCur,tripCur){
+  // If same currency, no conversion needed
+  if(!fromCur||fromCur===tripCur)return parseFloat(amt||0);
+  // Try to convert via settings rates: rates[fromCur] = how many secondary per 1 fromCur
+  // We need fromCur -> tripCur. Check if we have a direct rate stored.
+  // rates are stored as: 1 primaryCur = X secondaryCur
+  // So if tripCur is the secondary and fromCur is a primary: multiply by rates[fromCur]
+  var r=parseFloat((settings.rates||{})[fromCur]||0);
+  if(r&&settings.sec===tripCur)return parseFloat(amt||0)*r;
+  // reverse: if fromCur is secondary and tripCur is primary
+  var r2=parseFloat((settings.rates||{})[tripCur]||0);
+  if(r2&&settings.sec===fromCur)return parseFloat(amt||0)/r2;
+  // No rate available — just use the raw amount as fallback
+  return parseFloat(amt||0);
+}
+function tGen(t){var cur=t.cur||'USD';return(t.gen||[]).reduce(function(s,e){return s+convertToTrip(e.amt,e.cur||cur,cur);},0);}
+function tDay(t){var cur=t.cur||'USD';var s=0;var dv=t.day||{};Object.keys(dv).forEach(function(k){dv[k].forEach(function(e){s+=convertToTrip(e.amt,e.cur||cur,cur);});});return s;}
 function tAll(t){return tGen(t)+tDay(t);}
 function catIcon(c){return{food:'🍔',transport:'🚌',hotel:'🏨',activities:'🎭',shopping:'🛍️',other:'📦'}[c]||'📦';}
 
@@ -398,7 +415,7 @@ function renderDetail(){
   Object.keys(GTYPES).forEach(function(k){
     var g=GTYPES[k];
     var items=(t.gen||[]).filter(function(e){return e.type===k;});
-    var sum=items.reduce(function(s,e){return s+parseFloat(e.amt||0);},0);
+    var sum=items.reduce(function(s,e){return s+convertToTrip(e.amt,e.cur||cur,cur);},0);
     var ss=secAmt(sum,cur);
     tabG+='<div class="gcard" data-action="open-gen" data-type="'+k+'">';
     tabG+='<div class="gi">'+g.i+'</div><div class="gl">'+g.l+'</div>';
