@@ -343,19 +343,28 @@ function getDays(t){
   return a;
 }
 function convertToTrip(amt,fromCur,tripCur){
-  // If same currency, no conversion needed
-  if(!fromCur||fromCur===tripCur)return parseFloat(amt||0);
-  // Try to convert via settings rates: rates[fromCur] = how many secondary per 1 fromCur
-  // We need fromCur -> tripCur. Check if we have a direct rate stored.
-  // rates are stored as: 1 primaryCur = X secondaryCur
-  // So if tripCur is the secondary and fromCur is a primary: multiply by rates[fromCur]
-  var r=parseFloat((settings.rates||{})[fromCur]||0);
-  if(r&&settings.sec===tripCur)return parseFloat(amt||0)*r;
-  // reverse: if fromCur is secondary and tripCur is primary
-  var r2=parseFloat((settings.rates||{})[tripCur]||0);
-  if(r2&&settings.sec===fromCur)return parseFloat(amt||0)/r2;
-  // No rate available — just use the raw amount as fallback
-  return parseFloat(amt||0);
+  amt=parseFloat(amt||0);
+  if(!fromCur||fromCur===tripCur)return amt;
+  var rates=settings.rates||{};
+  var sec=settings.sec||'';
+  // rates[X] = how many ILS (secondary) per 1 X
+  // Convert fromCur -> tripCur via secondary as bridge
+  // Case 1: tripCur is the secondary currency
+  if(sec===tripCur){
+    var r=parseFloat(rates[fromCur]||0);
+    if(r)return amt*r;
+  }
+  // Case 2: fromCur is the secondary currency
+  if(sec===fromCur){
+    var r2=parseFloat(rates[tripCur]||0);
+    if(r2)return amt/r2;
+  }
+  // Case 3: both fromCur and tripCur have rates to secondary — convert via bridge
+  var rFrom=parseFloat(rates[fromCur]||0);
+  var rTrip=parseFloat(rates[tripCur]||0);
+  if(rFrom&&rTrip)return amt*(rFrom/rTrip);
+  // Fallback: no rate available, return raw
+  return amt;
 }
 function tGen(t){var cur=t.cur||'USD';return(t.gen||[]).reduce(function(s,e){return s+convertToTrip(e.amt,e.cur||cur,cur);},0);}
 function tDay(t){var cur=t.cur||'USD';var s=0;var dv=t.day||{};Object.keys(dv).forEach(function(k){dv[k].forEach(function(e){s+=convertToTrip(e.amt,e.cur||cur,cur);});});return s;}
@@ -437,7 +446,7 @@ function renderDetail(){
       var eConverted=convertToTrip(e.amt,eCur,cur);
       var eOriginal=(eCur!==cur)?('<div class="as">'+fmt(e.amt,eCur)+'</div>'):'';
       var eSec=secAmt(eConverted,cur);
-      tabG+='<div class="exp-a"><div class="am">'+fmt(eConverted,cur)+'</div>'+eOriginal+(eSec&&!eOriginal?'<div class="as">'+eSec+'</div>':'')+'</div>';
+      tabG+='<div class="exp-a"><div class="am">'+fmt(eConverted,cur)+'</div>'+eOriginal+(eSec?'<div class="as">'+eSec+'</div>':'')+'</div>';
       tabG+='<button class="xbtn" data-action="edit-gen" data-idx="'+i+'" style="color:var(--muted);font-size:15px">✏️</button>';
       tabG+='<button class="xbtn" data-action="del-gen" data-idx="'+i+'">×</button></div>';
     });
