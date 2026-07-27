@@ -197,8 +197,16 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(.5)}
       <select id="F_SECCUR"></select>
     </div>
     <div id="RATE_SECTION" style="display:none">
-      <div class="rate-note">💱 1 primary = how many <strong id="RATE_NAME"></strong></div>
+      <div class="rate-note">💱 Enter how many <strong id="RATE_NAME"></strong> equals 1 unit of each currency below</div>
       <div id="RATE_FIELDS"></div>
+      <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">
+        <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.7px;margin-bottom:8px">Add another currency</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr auto;gap:8px;align-items:end">
+          <div class="field" style="margin:0"><label>Currency code</label><input id="RF_CUSTOM_CODE" type="text" placeholder="e.g. PLN" maxlength="5" style="text-transform:uppercase"></div>
+          <div class="field" style="margin:0"><label>Rate</label><input id="RF_CUSTOM_RATE" type="number" placeholder="e.g. 0.85" min="0" step="any"></div>
+          <button class="tbtn" id="B_ADD_CUSTOM_RATE" style="padding:11px 10px;margin-bottom:0">Add</button>
+        </div>
+      </div>
     </div>
     <div class="btn2">
       <button class="cancel" id="B_SET_CANCEL">Cancel</button>
@@ -336,10 +344,14 @@ function secAmt(a,pc){
   return '&#8776;'+sym(settings.sec)+(parseFloat(a)*r).toFixed(2);
 }
 function fdate(d){return new Date(d+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});}
+function toDateStr(d){
+  var y=d.getFullYear(),m=(d.getMonth()+1).toString().padStart(2,'0'),dd=d.getDate().toString().padStart(2,'0');
+  return y+'-'+m+'-'+dd;
+}
 function getDays(t){
   if(!t.start||!t.end)return[];
   var a=[],s=new Date(t.start+'T00:00:00'),e=new Date(t.end+'T00:00:00');
-  for(var d=new Date(s);d<=e;d.setDate(d.getDate()+1))a.push(new Date(d).toISOString().slice(0,10));
+  for(var d=new Date(s);d<=e;d.setDate(d.getDate()+1))a.push(toDateStr(d));
   return a;
 }
 function convertToTrip(amt,fromCur,tripCur){
@@ -421,16 +433,30 @@ function renderDetail(){
   // General tab
   var tabG='<div class="sec-title">General Expenses <span class="badge">'+(t.gen||[]).length+'</span></div>';
   tabG+='<div class="gcards">';
+  // Map: which day-expense categories roll up into each general type
+  var DAY_ROLLUP={gas:['transport'],restaurant:['food'],groceries:['food'],attractions:['activities'],hotel:['hotel'],flight:['transport'],car:['transport'],insurance:[],visa:[]};
   Object.keys(GTYPES).forEach(function(k){
     var g=GTYPES[k];
     var items=(t.gen||[]).filter(function(e){return e.type===k;});
-    var sum=items.reduce(function(s,e){return s+convertToTrip(e.amt,e.cur||cur,cur);},0);
+    var genSum=items.reduce(function(s,e){return s+convertToTrip(e.amt,e.cur||cur,cur);},0);
+    // Add matching day expenses
+    var dayCats=DAY_ROLLUP[k]||[];
+    var daySum=0;var dayCount=0;
+    if(dayCats.length){
+      Object.values(t.day||{}).forEach(function(exps){
+        exps.forEach(function(e){
+          if(dayCats.indexOf(e.cat)>=0){daySum+=convertToTrip(e.amt,e.cur||cur,cur);dayCount++;}
+        });
+      });
+    }
+    var sum=genSum+daySum;
     var ss=secAmt(sum,cur);
+    var countLabel=items.length+(dayCount?' + '+dayCount+' daily':'');
     tabG+='<div class="gcard" data-action="open-gen" data-type="'+k+'">';
     tabG+='<div class="gi">'+g.i+'</div><div class="gl">'+g.l+'</div>';
     tabG+='<div class="ga">'+fmt(sum,cur)+'</div>';
     if(ss)tabG+='<div class="gs">'+ss+'</div>';
-    tabG+='<div class="gc">'+items.length+' item'+(items.length!==1?'s':'')+'</div></div>';
+    tabG+='<div class="gc">'+countLabel+(items.length+dayCount!==1?' items':' item')+'</div></div>';
   });
   tabG+='</div>';
   if((t.gen||[]).length){
@@ -599,10 +625,14 @@ function saveTrip(){
   if(editTripId){
     var t=getTrip(editTripId);
     t.name=name;t.desc=desc;t.start=start;t.end=end;t.cur=cur;t.emoji=pickEmoji;t.color=pickColor;
+    // Clean up day expenses and notes for days no longer in range
+    var validDays={};getDays(t).forEach(function(d){validDays[d]=1;});
+    if(t.day){Object.keys(t.day).forEach(function(d){if(!validDays[d])delete t.day[d];});}
+    if(t.notes){Object.keys(t.notes).forEach(function(d){if(!validDays[d])delete t.notes[d];});}
   } else {
     trips.push({id:'t'+Date.now(),name:name,desc:desc,start:start,end:end,cur:cur,emoji:pickEmoji,color:pickColor,gen:[],day:{},notes:{}});
   }
-  save();closeOvl('OVL_TRIP');renderHome();toast('Trip saved!');
+  save();closeOvl('OVL_TRIP');if(curTripId&&curTripId===editTripId){renderDetail();}renderHome();toast('Trip saved!');
 }
 
 function openSettings(){
@@ -615,10 +645,11 @@ function updateRateFields(sc){
   if(!sc){wrap.style.display='none';return;}
   wrap.style.display='block';
   document.getElementById('RATE_NAME').textContent=sc;
-  // Always include USD, EUR, ILS plus any trip currencies
+  // Always include USD, EUR, ILS plus any trip currencies plus any saved custom rates
   var primaries={USD:1,EUR:1,ILS:1};
   trips.forEach(function(t){primaries[t.cur||'USD']=1;});
-  // Remove the secondary currency itself from the list
+  // Also show any currencies already in saved rates
+  Object.keys(settings.rates||{}).forEach(function(k){primaries[k]=1;});
   delete primaries[sc];
   var html='';
   Object.keys(primaries).sort().forEach(function(p){
@@ -630,10 +661,13 @@ function saveSettings(){
   var sc=document.getElementById('F_SECCUR').value;
   var rates={};
   if(sc){
-    var primaries={USD:1,EUR:1,ILS:1};
-    trips.forEach(function(t){primaries[t.cur||'USD']=1;});
-    delete primaries[sc];
-    Object.keys(primaries).forEach(function(p){var el=document.getElementById('RF_'+p);var v=el?parseFloat(el.value||0):0;if(v>0)rates[p]=v;});
+    // Capture all RF_ inputs dynamically (includes custom ones)
+    document.querySelectorAll('[id^="RF_"]').forEach(function(el){
+      var code=el.id.replace('RF_','');
+      if(code==='CUSTOM_CODE'||code==='CUSTOM_RATE')return;
+      var v=parseFloat(el.value||0);
+      if(v>0)rates[code]=v;
+    });
   }
   settings={sec:sc,rates:rates};
   save();closeOvl('OVL_SETTINGS');renderHome();toast(sc?'Currency set!':'Secondary currency off');
@@ -829,6 +863,35 @@ document.addEventListener('click',function(e){
     if(eid==='B_BACKUP'){backupTrips();return;}
     if(eid==='B_IMPORT_BTN'){importTrips();return;}
     if(eid==='B_SETTINGS'){openSettings();return;}
+    if(eid==='B_ADD_EXTRA_CUR'){
+      var cur2=document.getElementById('F_EXTRA_CUR').value;
+      var rate2=parseFloat(document.getElementById('F_EXTRA_RATE').value||0);
+      if(!cur2){toast('Pick a currency');return;}
+      if(!rate2||rate2<=0){toast('Enter a valid rate');return;}
+      settings.rates[cur2]=rate2;
+      document.getElementById('F_EXTRA_RATE').value='';
+      updateRateFields(document.getElementById('F_SECCUR').value);
+      toast(cur2+' added!');
+      return;
+    }
+    if(eid==='B_ADD_CUSTOM_RATE'){
+      var code=document.getElementById('RF_CUSTOM_CODE').value.trim().toUpperCase();
+      var rate=parseFloat(document.getElementById('RF_CUSTOM_RATE').value||0);
+      if(!code||!rate){toast('Enter code and rate');return;}
+      var sc=document.getElementById('F_SECCUR').value;
+      // Add a new field to RATE_FIELDS
+      var existing=document.getElementById('RF_'+code);
+      if(existing){existing.value=rate;toast(code+' updated');}
+      else{
+        var div=document.createElement('div');div.className='field';
+        div.innerHTML='<label>1 '+code+' = ? '+sc+'</label><input type="number" id="RF_'+code+'" value="'+rate+'" min="0" step="any">';
+        document.getElementById('RATE_FIELDS').appendChild(div);
+        toast(code+' added');
+      }
+      document.getElementById('RF_CUSTOM_CODE').value='';
+      document.getElementById('RF_CUSTOM_RATE').value='';
+      return;
+    }
     if(eid==='B_SORT'){sortAsc=!sortAsc;document.getElementById('B_SORT').textContent=sortAsc?'🔼 Oldest':'🔽 Newest';renderHome();return;}
     if(eid==='B_TRIP_CANCEL'){closeOvl('OVL_TRIP');return;}
     if(eid==='B_TRIP_SAVE'){saveTrip();return;}
