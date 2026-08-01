@@ -252,7 +252,7 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(.5)}
     <h2 id="EXP_TITLE">Add Expense</h2>
     <div class="field"><label>Category</label>
       <select id="F_ECAT">
-        <option value="food">🍔 Food and Drinks</option><option value="transport">🚌 Transport</option>
+        <option value="food">🍔 Food and Drinks</option><option value="supermarket">🛒 Supermarket</option><option value="transport">🚌 Transport</option>
         <option value="activities">🎭 Activities</option><option value="shopping">🛍️ Shopping</option>
         <option value="hotel">🏨 Accommodation</option><option value="other">📦 Other</option>
       </select>
@@ -289,7 +289,7 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(.5)}
 var EMOJIS=['✈️','🌍','🏖️','🏔️','🗼','🌸','🎡','🏝️','🌮','🍕','🎭','🚂','🛳️','🏕️','🌅','🎪','🎿','🏄','🗽','🌴','🦁','🐬','🎨','🍜','🍷','🏯'];
 var COLORS=['#f0a500','#e05c2a','#2dd4a0','#3b82f6','#7c6fcd','#f05252','#10b981','#ec4899','#0891b2','#f97316','#1e3a5f','#4a1942','#064e3b','#374151','#f8fafc','#fef3c7'];
 var GTYPES={flight:{i:'✈️',l:'Flights'},hotel:{i:'🏨',l:'Hotels'},gas:{i:'⛽',l:'Gas'},car:{i:'🚗',l:'Car Rental'},insurance:{i:'🛡️',l:'Insurance'},visa:{i:'📋',l:'Visa/Entry'},attractions:{i:'🎟️',l:'Attractions'},groceries:{i:'🛒',l:'Food/Groceries'},restaurant:{i:'🍽️',l:'Restaurants'}};
-var CCOLORS={food:'#f0a500',transport:'#2dd4a0',hotel:'#7c6fcd',activities:'#e05c2a',shopping:'#f05252',other:'#7a8fa6',flight:'#3b82f6',gas:'#2dd4a0',car:'#06b6d4',insurance:'#8b5cf6',visa:'#ec4899',attractions:'#f97316',groceries:'#84cc16',restaurant:'#f0a500'};
+var CCOLORS={food:'#f0a500',supermarket:'#84cc16',transport:'#2dd4a0',hotel:'#7c6fcd',activities:'#e05c2a',shopping:'#f05252',other:'#7a8fa6',flight:'#3b82f6',gas:'#2dd4a0',car:'#06b6d4',insurance:'#8b5cf6',visa:'#ec4899',attractions:'#f97316',groceries:'#84cc16',restaurant:'#f0a500'};
 function toggleGenDates(){
   var type=document.getElementById('F_GTYPE').value;
   var show=(type==='flight'||type==='hotel'||type==='car');
@@ -381,7 +381,7 @@ function convertToTrip(amt,fromCur,tripCur){
 function tGen(t){var cur=t.cur||'USD';return(t.gen||[]).reduce(function(s,e){return s+convertToTrip(e.amt,e.cur||cur,cur);},0);}
 function tDay(t){var cur=t.cur||'USD';var s=0;var dv=t.day||{};Object.keys(dv).forEach(function(k){dv[k].forEach(function(e){s+=convertToTrip(e.amt,e.cur||cur,cur);});});return s;}
 function tAll(t){return tGen(t)+tDay(t);}
-function catIcon(c){return{food:'🍔',transport:'🚌',hotel:'🏨',activities:'🎭',shopping:'🛍️',other:'📦'}[c]||'📦';}
+function catIcon(c){return{food:'🍔',supermarket:'🛒',transport:'🚌',hotel:'🏨',activities:'🎭',shopping:'🛍️',other:'📦'}[c]||'📦';}
 
 function toast(m){var el=document.getElementById('toast');el.innerHTML=m;el.classList.add('on');setTimeout(function(){el.classList.remove('on');},2000);}
 function showScreen(id){document.querySelectorAll('.screen').forEach(function(s){s.classList.remove('on');});document.getElementById(id).classList.add('on');}
@@ -434,7 +434,7 @@ function renderDetail(){
   var tabG='<div class="sec-title">General Expenses <span class="badge">'+(t.gen||[]).length+'</span></div>';
   tabG+='<div class="gcards">';
   // Map: which day-expense categories roll up into each general type
-  var DAY_ROLLUP={gas:['transport'],restaurant:['food'],groceries:['food'],attractions:['activities'],hotel:['hotel'],flight:['transport'],car:['transport'],insurance:[],visa:[]};
+  var DAY_ROLLUP={gas:['transport'],restaurant:['food'],groceries:['supermarket'],attractions:['activities'],hotel:['hotel'],flight:['transport'],car:['transport'],insurance:[],visa:[]};
   Object.keys(GTYPES).forEach(function(k){
     var g=GTYPES[k];
     var items=(t.gen||[]).filter(function(e){return e.type===k;});
