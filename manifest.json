@@ -4,7 +4,7 @@
   "description": "Travel expense tracker",
   "start_url": ".",
   "scope": "/voyagerApp/",
-  "display": "standalone",
+  "display": "fullscreen",
   "orientation": "portrait",
   "background_color": "#0f1923",
   "theme_color": "#0f1923",
