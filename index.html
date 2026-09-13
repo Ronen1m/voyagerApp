@@ -224,7 +224,7 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(.5)}
     <div class="field"><label>Type</label>
       <select id="F_GTYPE">
         <option value="flight">✈️ Flight</option><option value="hotel">🏨 Hotel</option>
-        <option value="gas">⛽ Gas / Transport</option><option value="car">🚗 Car Rental</option>
+        <option value="gas">⛽ Gas / Transport</option><option value="car">🚗 Car / Train</option>
         <option value="insurance">🛡️ Insurance</option><option value="visa">📋 Visa / Entry</option>
         <option value="attractions">🎟️ Attractions</option><option value="groceries">🛒 Food/Groceries</option>
         <option value="restaurant">🍽️ Restaurants</option>
@@ -303,7 +303,7 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(.5)}
 <script>
 var EMOJIS=['✈️','🌍','🏖️','🏔️','🗼','🌸','🎡','🏝️','🌮','🍕','🎭','🚂','🛳️','🏕️','🌅','🎪','🎿','🏄','🗽','🌴','🦁','🐬','🎨','🍜','🍷','🏯'];
 var COLORS=['#f0a500','#e05c2a','#2dd4a0','#3b82f6','#7c6fcd','#f05252','#10b981','#ec4899','#0891b2','#f97316','#1e3a5f','#4a1942','#064e3b','#374151','#f8fafc','#fef3c7'];
-var GTYPES={flight:{i:'✈️',l:'Flights'},hotel:{i:'🏨',l:'Hotels'},gas:{i:'⛽',l:'Gas'},car:{i:'🚗',l:'Car Rental'},insurance:{i:'🛡️',l:'Insurance'},visa:{i:'📋',l:'Visa/Entry'},attractions:{i:'🎟️',l:'Attractions'},groceries:{i:'🛒',l:'Food/Groceries'},restaurant:{i:'🍽️',l:'Restaurants'},other:{i:'📦',l:'Other'}};
+var GTYPES={flight:{i:'✈️',l:'Flights'},hotel:{i:'🏨',l:'Hotels'},gas:{i:'⛽',l:'Gas'},car:{i:'🚗',l:'Car/Train'},insurance:{i:'🛡️',l:'Insurance'},visa:{i:'📋',l:'Visa/Entry'},attractions:{i:'🎟️',l:'Attractions'},groceries:{i:'🛒',l:'Food/Groceries'},restaurant:{i:'🍽️',l:'Restaurants'},other:{i:'📦',l:'Other'}};
 var CCOLORS={food:'#f0a500',supermarket:'#84cc16',transport:'#2dd4a0',hotel:'#7c6fcd',activities:'#e05c2a',shopping:'#f05252',other:'#7a8fa6',flight:'#3b82f6',gas:'#2dd4a0',car:'#06b6d4',insurance:'#8b5cf6',visa:'#ec4899',attractions:'#f97316',groceries:'#84cc16',restaurant:'#f0a500'};
 function toggleGenDates(){
   var type=document.getElementById('F_GTYPE').value;
@@ -396,7 +396,7 @@ function convertToTrip(amt,fromCur,tripCur){
 function tGen(t){var cur=t.cur||'USD';return(t.gen||[]).reduce(function(s,e){return s+convertToTrip(e.amt,e.cur||cur,cur);},0);}
 function tDay(t){var cur=t.cur||'USD';var s=0;var dv=t.day||{};Object.keys(dv).forEach(function(k){dv[k].forEach(function(e){s+=convertToTrip(e.amt,e.cur||cur,cur);});});return s;}
 function tAll(t){return tGen(t)+tDay(t);}
-function catIcon(c){return{food:'🍔',supermarket:'🛒',transport:'🚌',hotel:'🏨',activities:'🎭',shopping:'🛍️',other:'📦'}[c]||'📦';}
+function catIcon(c){return{food:'🍔',supermarket:'🛒',transport:'🚌',train:'🚂',hotel:'🏨',activities:'🎭',shopping:'🛍️',other:'📦'}[c]||'📦';}
 
 function toast(m){var el=document.getElementById('toast');el.innerHTML=m;el.classList.add('on');setTimeout(function(){el.classList.remove('on');},2000);}
 function showScreen(id){document.querySelectorAll('.screen').forEach(function(s){s.classList.remove('on');});document.getElementById(id).classList.add('on');}
@@ -449,7 +449,7 @@ function renderDetail(){
   var tabG='<div class="sec-title">General Expenses <span class="badge">'+(t.gen||[]).length+'</span></div>';
   tabG+='<div class="gcards">';
   // Map: which day-expense categories roll up into each general type
-  var DAY_ROLLUP={gas:['transport'],restaurant:['food'],groceries:['supermarket'],attractions:['activities'],hotel:['hotel'],flight:['transport'],car:['transport'],insurance:[],visa:[],other:['other','shopping']};
+  var DAY_ROLLUP={gas:[],restaurant:['food'],groceries:['supermarket'],attractions:['activities'],hotel:['hotel'],flight:[],car:['transport'],insurance:[],visa:[],other:['other','shopping']};
   Object.keys(GTYPES).forEach(function(k){
     var g=GTYPES[k];
     var items=(t.gen||[]).filter(function(e){return e.type===k;});
@@ -705,7 +705,7 @@ function openGenList(type){
 function renderGenList(type){
   var t=getTrip(curTripId);
   var cur=t.cur||'USD';
-  var DAY_ROLLUP2={gas:['transport'],restaurant:['food'],groceries:['supermarket'],attractions:['activities'],hotel:['hotel'],flight:['transport'],car:['transport'],insurance:[],visa:[],other:['other','shopping']};
+  var DAY_ROLLUP2={gas:[],restaurant:['food'],groceries:['supermarket'],attractions:['activities'],hotel:['hotel'],flight:[],car:['transport'],insurance:[],visa:[],other:['other','shopping']};
   var genItems=(t.gen||[]).map(function(e,i){return{e:e,i:i};}).filter(function(x){return x.e.type===type;});
   var dayCats=DAY_ROLLUP2[type]||[];
   var dayItems=[];
@@ -735,8 +735,8 @@ function renderGenList(type){
       html+='<div class="exp-i"><div class="exp-d">'+(e.desc||e.type||'-')+'</div>';
       html+='<div class="exp-c">'+(dl||eCur)+'</div></div>';
       html+='<div class="exp-a"><div class="am">'+fmt(eConv,cur)+'</div>'+eOrig+'</div>';
-      html+='<button class="xbtn" data-action="gen-list-edit" data-idx="'+i+'" style="font-size:15px;color:var(--accent)">&#9999;&#65039;</button>';
-      html+='<button class="xbtn" data-action="gen-list-del" data-idx="'+i+'" data-type="'+e.type+'">x</button>';
+      html+='<button class="xbtn" data-action="gen-list-edit" data-idx="'+i+'" style="font-size:12px;color:var(--accent);background:var(--surf2);border:1px solid var(--border);border-radius:6px;padding:3px 7px">Edit</button>';
+      html+='<button class="xbtn" data-action="gen-list-del" data-idx="'+i+'" data-type="'+e.type+'">×</button>';
       html+='</div>';
     });
     html+='</div>';
@@ -759,8 +759,8 @@ function renderGenList(type){
         html+='<div class="exp-i"><div class="exp-d">'+catIcon(e.cat)+' '+(e.desc||e.cat)+'</div>';
         html+='<div class="exp-c">'+dlbl+dn.toLocaleDateString('en-US',{month:'short',day:'numeric'})+'</div></div>';
         html+='<div class="exp-a"><div class="am">'+fmt(eConv,cur)+'</div>'+eOrig+'</div>';
-        html+='<button class="xbtn" data-action="gen-list-edit-day" data-date="'+x.date+'" data-idx="'+x.ei+'" data-dayidx="'+(x.dayIdx>=0?x.dayIdx:0)+'" style="font-size:15px;color:var(--accent)">&#9999;&#65039;</button>';
-        html+='<button class="xbtn" data-action="gen-list-del-day" data-date="'+x.date+'" data-idx="'+x.ei+'" data-type="'+type+'">x</button>';
+        html+='<button class="xbtn" data-action="gen-list-edit-day" data-date="'+x.date+'" data-idx="'+x.ei+'" data-dayidx="'+(x.dayIdx>=0?x.dayIdx:0)+'" style="font-size:12px;color:var(--accent);background:var(--surf2);border:1px solid var(--border);border-radius:6px;padding:3px 7px">Edit</button>';
+        html+='<button class="xbtn" data-action="gen-list-del-day" data-date="'+x.date+'" data-idx="'+x.ei+'" data-type="'+type+'">×</button>';
         html+='</div>';
       });
       html+='</div>';
@@ -1024,7 +1024,7 @@ document.addEventListener('click',function(e){
     }
     if(a==='open-gen'){openGenForm(el.dataset.type);return;}
     if(a==='view-gen'){openGenList(el.dataset.type);return;}
-    if(a==='edit-gen'){openGenForm(null,parseInt(el.dataset.idx));return;}
+    if(a==='edit-gen'){openGenForm(getTrip(curTripId).gen[parseInt(el.dataset.idx)].type,parseInt(el.dataset.idx));return;}
     if(a==='del-gen'){delGen(parseInt(el.dataset.idx));return;}
     if(a==='day-toggle'){
       var dc=document.getElementById('DC_'+el.dataset.date);
