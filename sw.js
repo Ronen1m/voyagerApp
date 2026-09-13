@@ -1,7 +1,7 @@
 var CACHE = 'voyager-v4';
 var FILES = [
-  './',
-  './index.html'
+  '/voyagerApp/',
+  '/voyagerApp/index.html'
 ];
 
 self.addEventListener('install', function(e){
@@ -30,7 +30,7 @@ self.addEventListener('fetch', function(e){
         });
       });
     }).catch(function(){
-      return caches.match('./');
+      return caches.match('/voyagerApp/');
     })
   );
 });

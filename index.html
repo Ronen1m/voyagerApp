@@ -5,6 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Voyager Expenses v3</title>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@400;500&display=swap" rel="stylesheet">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0f1923">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Voyager">
 <style>
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
 :root{
@@ -143,6 +149,15 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(.5)}
 
 <div class="toast" id="toast"></div>
 
+<div id="INSTALL_BAR" style="display:none;background:linear-gradient(135deg,#1a2535,#243044);padding:10px 14px;align-items:center;gap:10px;border-bottom:1px solid rgba(240,165,0,0.3)">
+  <div style="font-size:22px">✈️</div>
+  <div style="flex:1">
+    <div style="font-family:var(--fh);font-size:13px;font-weight:700">Install Voyager</div>
+    <div style="font-size:11px;color:var(--muted)">Add to home screen for app experience</div>
+  </div>
+  <button id="B_INSTALL" style="background:linear-gradient(135deg,var(--accent),var(--accent2));border:none;border-radius:8px;padding:7px 14px;color:#fff;font-family:var(--fh);font-size:12px;font-weight:700;cursor:pointer">Install</button>
+  <button id="B_INSTALL_CLOSE" style="background:none;border:none;color:var(--muted);font-size:18px;cursor:pointer;padding:4px">×</button>
+</div>
 <div class="topbar">
   <div class="logo">✈ Voyager</div>
   <div class="topbar-btns">
@@ -1095,6 +1110,31 @@ fillCurSelect('F_GCUR','USD');
 fillCurSelect('F_ECUR','USD');
 fillSecSelect('F_SECCUR',settings.sec||'');
 renderHome();
+
+// PWA service worker
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.register('/voyagerApp/sw.js').catch(function(e){console.log('SW error',e);});
+}
+
+// Install banner
+var deferredPrompt=null;
+window.addEventListener('beforeinstallprompt',function(e){
+  e.preventDefault();
+  deferredPrompt=e;
+  document.getElementById('INSTALL_BAR').style.display='flex';
+});
+document.getElementById('B_INSTALL').addEventListener('click',function(){
+  if(deferredPrompt){
+    deferredPrompt.prompt();
+    deferredPrompt.userChoice.then(function(){
+      deferredPrompt=null;
+      document.getElementById('INSTALL_BAR').style.display='none';
+    });
+  }
+});
+document.getElementById('B_INSTALL_CLOSE').addEventListener('click',function(){
+  document.getElementById('INSTALL_BAR').style.display='none';
+});
 </script>
 </body>
 </html>
