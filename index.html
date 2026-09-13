@@ -84,13 +84,15 @@ body{background:var(--bg);color:var(--text);font-family:var(--fb);min-height:100
 .tabpane{display:none}.tabpane.on{display:block}
 .sec-title{font-family:var(--fh);font-weight:700;font-size:15px;margin:18px 0 10px;display:flex;align-items:center;gap:8px}
 .badge{background:var(--surf2);color:var(--muted);font-size:11px;padding:2px 8px;border-radius:20px}
-.gcards{display:grid;grid-template-columns:1fr 1fr;gap:9px}
-.gcard{background:var(--surf);border:1px solid var(--border);border-radius:var(--r);padding:13px;cursor:pointer;user-select:none}
-.gcard .gi{font-size:24px;margin-bottom:7px}
-.gcard .gl{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px}
-.gcard .ga{font-family:var(--fh);font-size:17px;font-weight:700;color:var(--accent);margin-top:3px}
-.gcard .gs{font-size:10px;color:var(--muted);margin-top:1px}
-.gcard .gc{font-size:10px;color:var(--muted);margin-top:2px}
+.gcards{display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px}
+.gcard{background:var(--surf);border:1px solid var(--border);border-radius:10px;padding:10px;cursor:pointer;user-select:none;display:flex;align-items:center;gap:8px;min-height:64px}
+.gcard .gi{font-size:28px;flex-shrink:0}
+.gcard-right{flex:1;min-width:0;display:flex;flex-direction:column;align-items:flex-end}
+.gcard-left{display:flex;flex-direction:column;justify-content:flex-end;flex-shrink:0}
+.gcard .gl{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px}
+.gcard .ga{font-family:var(--fh);font-size:14px;font-weight:800;color:var(--accent)}
+.gcard .gs{font-size:9px;color:var(--muted)}
+.gcard .gc{font-size:9px;color:var(--muted)}
 .exp-list{background:var(--surf);border:1px solid var(--border);border-radius:var(--r);overflow:hidden;margin-top:10px}
 .exp-row{display:flex;align-items:center;gap:10px;padding:11px 13px;border-bottom:1px solid var(--border)}
 .exp-row:last-child{border-bottom:none}
@@ -226,6 +228,7 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(.5)}
         <option value="insurance">🛡️ Insurance</option><option value="visa">📋 Visa / Entry</option>
         <option value="attractions">🎟️ Attractions</option><option value="groceries">🛒 Food/Groceries</option>
         <option value="restaurant">🍽️ Restaurants</option>
+        <option value="other">📦 Other</option>
       </select>
     </div>
     <div class="field"><label>Description</label><input id="F_GDESC" type="text" placeholder="e.g. Flight TLV to JFK"></div>
@@ -285,10 +288,22 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(.5)}
   </div>
 </div>
 
+<div class="overlay" id="OVL_GEN_LIST">
+  <div class="sheet">
+    <div class="handle"></div>
+    <h2 id="GEN_LIST_TITLE">Expenses</h2>
+    <div id="GEN_LIST_BODY"></div>
+    <div style="display:flex;gap:10px;margin-top:12px">
+      <button class="cancel btn2-cancel" id="B_GEN_LIST_CLOSE" style="flex:1;padding:12px;border-radius:10px;border:none;background:var(--surf2);color:var(--text);font-family:var(--fh);font-size:14px;font-weight:600;cursor:pointer">Close</button>
+      <button class="ok btn2-ok" id="B_GEN_LIST_ADD" style="flex:1;padding:12px;border-radius:10px;border:none;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;font-family:var(--fh);font-size:14px;font-weight:600;cursor:pointer">+ Add New</button>
+    </div>
+  </div>
+</div>
+
 <script>
 var EMOJIS=['✈️','🌍','🏖️','🏔️','🗼','🌸','🎡','🏝️','🌮','🍕','🎭','🚂','🛳️','🏕️','🌅','🎪','🎿','🏄','🗽','🌴','🦁','🐬','🎨','🍜','🍷','🏯'];
 var COLORS=['#f0a500','#e05c2a','#2dd4a0','#3b82f6','#7c6fcd','#f05252','#10b981','#ec4899','#0891b2','#f97316','#1e3a5f','#4a1942','#064e3b','#374151','#f8fafc','#fef3c7'];
-var GTYPES={flight:{i:'✈️',l:'Flights'},hotel:{i:'🏨',l:'Hotels'},gas:{i:'⛽',l:'Gas'},car:{i:'🚗',l:'Car Rental'},insurance:{i:'🛡️',l:'Insurance'},visa:{i:'📋',l:'Visa/Entry'},attractions:{i:'🎟️',l:'Attractions'},groceries:{i:'🛒',l:'Food/Groceries'},restaurant:{i:'🍽️',l:'Restaurants'}};
+var GTYPES={flight:{i:'✈️',l:'Flights'},hotel:{i:'🏨',l:'Hotels'},gas:{i:'⛽',l:'Gas'},car:{i:'🚗',l:'Car Rental'},insurance:{i:'🛡️',l:'Insurance'},visa:{i:'📋',l:'Visa/Entry'},attractions:{i:'🎟️',l:'Attractions'},groceries:{i:'🛒',l:'Food/Groceries'},restaurant:{i:'🍽️',l:'Restaurants'},other:{i:'📦',l:'Other'}};
 var CCOLORS={food:'#f0a500',supermarket:'#84cc16',transport:'#2dd4a0',hotel:'#7c6fcd',activities:'#e05c2a',shopping:'#f05252',other:'#7a8fa6',flight:'#3b82f6',gas:'#2dd4a0',car:'#06b6d4',insurance:'#8b5cf6',visa:'#ec4899',attractions:'#f97316',groceries:'#84cc16',restaurant:'#f0a500'};
 function toggleGenDates(){
   var type=document.getElementById('F_GTYPE').value;
@@ -394,7 +409,7 @@ function renderHome(){
     el.innerHTML='<div class="empty"><div class="ei">🗺️</div><p>No trips yet.<br>Tap <strong>+ New Trip</strong> to start!</p></div>';
     return;
   }
-  var sorted=trips.slice().sort(function(a,b){return(b.start||'')>(a.start||'')?1:-1;});
+  var sorted=trips.slice().sort(function(a,b){var da=a.start||'',db=b.start||'';if(sortAsc)return da>db?1:(da<db?-1:0);return db>da?1:(db<da?-1:0);});
   var html='';
   sorted.forEach(function(t){
     var tot=tAll(t),cur=t.cur||'USD',nd=getDays(t).length,pd=nd>0?tot/nd:0;
@@ -434,7 +449,7 @@ function renderDetail(){
   var tabG='<div class="sec-title">General Expenses <span class="badge">'+(t.gen||[]).length+'</span></div>';
   tabG+='<div class="gcards">';
   // Map: which day-expense categories roll up into each general type
-  var DAY_ROLLUP={gas:['transport'],restaurant:['food'],groceries:['supermarket'],attractions:['activities'],hotel:['hotel'],flight:['transport'],car:['transport'],insurance:[],visa:[]};
+  var DAY_ROLLUP={gas:['transport'],restaurant:['food'],groceries:['supermarket'],attractions:['activities'],hotel:['hotel'],flight:['transport'],car:['transport'],insurance:[],visa:[],other:['other','shopping']};
   Object.keys(GTYPES).forEach(function(k){
     var g=GTYPES[k];
     var items=(t.gen||[]).filter(function(e){return e.type===k;});
@@ -452,11 +467,16 @@ function renderDetail(){
     var sum=genSum+daySum;
     var ss=secAmt(sum,cur);
     var countLabel=items.length+(dayCount?' + '+dayCount+' daily':'');
-    tabG+='<div class="gcard" data-action="open-gen" data-type="'+k+'">';
-    tabG+='<div class="gi">'+g.i+'</div><div class="gl">'+g.l+'</div>';
+    tabG+='<div class="gcard" data-action="view-gen" data-type="'+k+'">';
+    tabG+='<div class="gi">'+g.i+'</div>';
+    tabG+='<div class="gcard-right">';
     tabG+='<div class="ga">'+fmt(sum,cur)+'</div>';
     if(ss)tabG+='<div class="gs">'+ss+'</div>';
-    tabG+='<div class="gc">'+countLabel+(items.length+dayCount!==1?' items':' item')+'</div></div>';
+    tabG+='<div style="flex:1"></div>';
+    tabG+='<div style="display:flex;justify-content:space-between;width:100%;align-items:flex-end">';
+    tabG+='<div class="gl">'+g.l+'</div>';
+    tabG+='<div class="gc">'+countLabel+(items.length+dayCount!==1?' items':' item')+'</div>';
+    tabG+='</div></div></div>';
   });
   tabG+='</div>';
   if((t.gen||[]).length){
@@ -487,7 +507,7 @@ function renderDetail(){
   } else {
     dd.forEach(function(d,i){
       var exps=(t.day||{})[d]||[];
-      var tot2=exps.reduce(function(s,e){return s+parseFloat(e.amt||0);},0);
+      var tot2=exps.reduce(function(s,e){return s+convertToTrip(e.amt,e.cur||cur,cur);},0);
       var dn=new Date(d+'T00:00:00');
       var ss=secAmt(tot2,cur);
       var note=(t.notes||{})[d]||'';
@@ -673,6 +693,46 @@ function saveSettings(){
   save();closeOvl('OVL_SETTINGS');renderHome();toast(sc?'Currency set!':'Secondary currency off');
 }
 
+function openGenList(type){
+  var t=getTrip(curTripId);
+  var g=GTYPES[type];
+  document.getElementById('GEN_LIST_TITLE').textContent=g.i+' '+g.l;
+  document.getElementById('B_GEN_LIST_ADD').dataset.type=type;
+  renderGenList(type);
+  openOvl('OVL_GEN_LIST');
+}
+
+function renderGenList(type){
+  var t=getTrip(curTripId);
+  var cur=t.cur||'USD';
+  var items=(t.gen||[]).map(function(e,i){return{e:e,i:i};}).filter(function(x){return x.e.type===type;});
+  var html='';
+  if(!items.length){
+    html='<p style="color:var(--muted);font-size:13px;padding:16px 0;text-align:center">No items yet. Tap + Add New.</p>';
+  } else {
+    html='<div class="exp-list">';
+    items.forEach(function(x){
+      var e=x.e,i=x.i;
+      var eCur=e.cur||cur;
+      var eConverted=convertToTrip(e.amt,eCur,cur);
+      var eOriginal=(eCur!==cur)?('<div class="as">'+fmt(e.amt,eCur)+'</div>'):'';
+      var dateLine=(e.dateFrom||e.dateTo)?((e.dateFrom?fdate(e.dateFrom):'?')+' → '+(e.dateTo?fdate(e.dateTo):'?')):'';
+      html+='<div class="exp-row">';
+      html+='<div class="dot" style="background:'+(CCOLORS[e.type]||'#7a8fa6')+'"></div>';
+      html+='<div class="exp-i">';
+      html+='<div class="exp-d">'+(e.desc||e.type||'—')+'</div>';
+      html+='<div class="exp-c">'+(dateLine||eCur)+'</div>';
+      html+='</div>';
+      html+='<div class="exp-a"><div class="am">'+fmt(eConverted,cur)+'</div>'+eOriginal+'</div>';
+      html+='<button class="xbtn" data-action="gen-list-edit" data-idx="'+i+'" style="font-size:16px;color:var(--accent)">✏️</button>';
+      html+='<button class="xbtn" data-action="gen-list-del" data-idx="'+i+'" data-type="'+e.type+'">×</button>';
+      html+='</div>';
+    });
+    html+='</div>';
+  }
+  document.getElementById('GEN_LIST_BODY').innerHTML=html;
+}
+
 function openGenForm(type,editIdx){
   var t=getTrip(curTripId);
   editGenIdx=(editIdx!==undefined)?editIdx:-1;
@@ -721,7 +781,7 @@ function saveGen(){
   }
   save();closeOvl('OVL_GEN');renderDetail();
 }
-function delGen(i){var t=getTrip(curTripId);t.gen.splice(i,1);save();renderDetail();toast('Deleted');}
+function delGen(i){if(!confirm('Delete this expense?'))return;var t=getTrip(curTripId);t.gen.splice(i,1);save();renderDetail();toast('Deleted');}
 
 function openExpForm(date,idx,editIdx){
   curDay=date;
@@ -765,7 +825,7 @@ function saveExp(){
   }
   save();closeOvl('OVL_EXP');renderDetail();
 }
-function delExp(date,i){var t=getTrip(curTripId);t.day[date].splice(i,1);save();renderDetail();toast('Deleted');}
+function delExp(date,i){if(!confirm('Delete this expense?'))return;var t=getTrip(curTripId);t.day[date].splice(i,1);save();renderDetail();toast('Deleted');}
 
 function openNoteForm(date,idx){
   curDay=date;
@@ -863,6 +923,8 @@ document.addEventListener('click',function(e){
     if(eid==='B_BACKUP'){backupTrips();return;}
     if(eid==='B_IMPORT_BTN'){importTrips();return;}
     if(eid==='B_SETTINGS'){openSettings();return;}
+    if(eid==='B_GEN_LIST_CLOSE'){closeOvl('OVL_GEN_LIST');return;}
+    if(eid==='B_GEN_LIST_ADD'){closeOvl('OVL_GEN_LIST');openGenForm(el.dataset.type);return;}
     if(eid==='B_ADD_EXTRA_CUR'){
       var cur2=document.getElementById('F_EXTRA_CUR').value;
       var rate2=parseFloat(document.getElementById('F_EXTRA_RATE').value||0);
@@ -912,7 +974,7 @@ document.addEventListener('click',function(e){
     }
     if(a==='detail'){goDetail(el.dataset.id);return;}
     if(a==='edit'){openTripForm(el.dataset.id);return;}
-    if(a==='del'){if(confirm('Delete this trip?')){trips=trips.filter(function(t){return t.id!==el.dataset.id;});save();renderHome();toast('Deleted');}return;}
+    if(a==='del'){if(confirm('Delete this trip? This cannot be undone.')){trips=trips.filter(function(t){return t.id!==el.dataset.id;});save();renderHome();toast('Deleted');}return;}
     if(a==='go-home'){goHome();return;}
     if(a==='export'){exportCSV(curTripId);return;}
     if(a==='tab'){
@@ -924,6 +986,7 @@ document.addEventListener('click',function(e){
       return;
     }
     if(a==='open-gen'){openGenForm(el.dataset.type);return;}
+    if(a==='view-gen'){openGenList(el.dataset.type);return;}
     if(a==='edit-gen'){openGenForm(null,parseInt(el.dataset.idx));return;}
     if(a==='del-gen'){delGen(parseInt(el.dataset.idx));return;}
     if(a==='day-toggle'){
