@@ -962,6 +962,35 @@ document.addEventListener('click',function(e){
     if(eid==='B_SETTINGS'){openSettings();return;}
     if(eid==='B_GEN_LIST_CLOSE'){closeOvl('OVL_GEN_LIST');return;}
     if(eid==='B_GEN_LIST_ADD'){closeOvl('OVL_GEN_LIST');openGenForm(el.dataset.type);return;}
+    if(a==='gen-list-edit'){
+      var idx3=parseInt(el.dataset.idx);
+      closeOvl('OVL_GEN_LIST');
+      openGenForm(null,idx3);
+      return;
+    }
+    if(a==='gen-list-del'){
+      if(!confirm('Delete this expense?'))return;
+      var t3=getTrip(curTripId);
+      t3.gen.splice(parseInt(el.dataset.idx),1);
+      save();renderDetail();
+      renderGenList(document.getElementById('B_GEN_LIST_ADD').dataset.type);
+      toast('Deleted');
+      return;
+    }
+    if(a==='gen-list-edit-day'){
+      closeOvl('OVL_GEN_LIST');
+      openExpForm(el.dataset.date,parseInt(el.dataset.dayidx),parseInt(el.dataset.idx));
+      return;
+    }
+    if(a==='gen-list-del-day'){
+      if(!confirm('Delete this expense?'))return;
+      var t4=getTrip(curTripId);
+      if(t4.day[el.dataset.date])t4.day[el.dataset.date].splice(parseInt(el.dataset.idx),1);
+      save();renderDetail();
+      renderGenList(document.getElementById('B_GEN_LIST_ADD').dataset.type);
+      toast('Deleted');
+      return;
+    }
     if(eid==='B_ADD_EXTRA_CUR'){
       var cur2=document.getElementById('F_EXTRA_CUR').value;
       var rate2=parseFloat(document.getElementById('F_EXTRA_RATE').value||0);
