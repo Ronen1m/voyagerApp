@@ -84,13 +84,13 @@ body{background:var(--bg);color:var(--text);font-family:var(--fb);min-height:100
 .tabpane{display:none}.tabpane.on{display:block}
 .sec-title{font-family:var(--fh);font-weight:700;font-size:15px;margin:18px 0 10px;display:flex;align-items:center;gap:8px}
 .badge{background:var(--surf2);color:var(--muted);font-size:11px;padding:2px 8px;border-radius:20px}
-.gcards{display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px}
-.gcard{background:var(--surf);border:1px solid var(--border);border-radius:10px;padding:10px;cursor:pointer;user-select:none;display:flex;align-items:center;gap:8px;min-height:64px}
-.gcard .gi{font-size:28px;flex-shrink:0}
+.gcards{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.gcard{background:var(--surf);border:1px solid var(--border);border-radius:10px;padding:9px 10px;cursor:pointer;user-select:none;display:flex;align-items:center;gap:8px;min-height:56px}
+.gcard .gi{font-size:22px;flex-shrink:0}
 .gcard-right{flex:1;min-width:0;display:flex;flex-direction:column;align-items:flex-end}
 .gcard-left{display:flex;flex-direction:column;justify-content:flex-end;flex-shrink:0}
-.gcard .gl{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px}
-.gcard .ga{font-family:var(--fh);font-size:14px;font-weight:800;color:var(--accent)}
+.gcard .gl{font-size:8px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px}
+.gcard .ga{font-family:var(--fh);font-size:12px;font-weight:700;color:var(--accent)}
 .gcard .gs{font-size:9px;color:var(--muted)}
 .gcard .gc{font-size:9px;color:var(--muted)}
 .exp-list{background:var(--surf);border:1px solid var(--border);border-radius:var(--r);overflow:hidden;margin-top:10px}
@@ -705,31 +705,68 @@ function openGenList(type){
 function renderGenList(type){
   var t=getTrip(curTripId);
   var cur=t.cur||'USD';
-  var items=(t.gen||[]).map(function(e,i){return{e:e,i:i};}).filter(function(x){return x.e.type===type;});
+  var DAY_ROLLUP2={gas:['transport'],restaurant:['food'],groceries:['supermarket'],attractions:['activities'],hotel:['hotel'],flight:['transport'],car:['transport'],insurance:[],visa:[],other:['other','shopping']};
+  var genItems=(t.gen||[]).map(function(e,i){return{e:e,i:i};}).filter(function(x){return x.e.type===type;});
+  var dayCats=DAY_ROLLUP2[type]||[];
+  var dayItems=[];
+  var allDays=getDays(t);
+  allDays.forEach(function(date){
+    var dayIdx=allDays.indexOf(date);
+    (t.day[date]||[]).forEach(function(e,ei){
+      if(dayCats.indexOf(e.cat)>=0)dayItems.push({e:e,date:date,dayIdx:dayIdx,ei:ei});
+    });
+  });
+
   var html='';
-  if(!items.length){
-    html='<p style="color:var(--muted);font-size:13px;padding:16px 0;text-align:center">No items yet. Tap + Add New.</p>';
+
+  // General items section
+  html+='<div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;padding:8px 2px 4px">General Expenses</div>';
+  if(!genItems.length){
+    html+='<p style="color:var(--muted);font-size:12px;padding:4px 2px 10px">No general items. Tap + Add New.</p>';
   } else {
-    html='<div class="exp-list">';
-    items.forEach(function(x){
-      var e=x.e,i=x.i;
-      var eCur=e.cur||cur;
-      var eConverted=convertToTrip(e.amt,eCur,cur);
-      var eOriginal=(eCur!==cur)?('<div class="as">'+fmt(e.amt,eCur)+'</div>'):'';
-      var dateLine=(e.dateFrom||e.dateTo)?((e.dateFrom?fdate(e.dateFrom):'?')+' → '+(e.dateTo?fdate(e.dateTo):'?')):'';
+    html+='<div class="exp-list">';
+    genItems.forEach(function(x){
+      var e=x.e,i=x.i,eCur=e.cur||cur;
+      var eConv=convertToTrip(e.amt,eCur,cur);
+      var eOrig=(eCur!==cur)?('<div class="as">'+fmt(e.amt,eCur)+'</div>'):'';
+      var dl=(e.dateFrom||e.dateTo)?((e.dateFrom?fdate(e.dateFrom):'?')+' to '+(e.dateTo?fdate(e.dateTo):'?')):'';
       html+='<div class="exp-row">';
       html+='<div class="dot" style="background:'+(CCOLORS[e.type]||'#7a8fa6')+'"></div>';
-      html+='<div class="exp-i">';
-      html+='<div class="exp-d">'+(e.desc||e.type||'—')+'</div>';
-      html+='<div class="exp-c">'+(dateLine||eCur)+'</div>';
-      html+='</div>';
-      html+='<div class="exp-a"><div class="am">'+fmt(eConverted,cur)+'</div>'+eOriginal+'</div>';
-      html+='<button class="xbtn" data-action="gen-list-edit" data-idx="'+i+'" style="font-size:16px;color:var(--accent)">✏️</button>';
-      html+='<button class="xbtn" data-action="gen-list-del" data-idx="'+i+'" data-type="'+e.type+'">×</button>';
+      html+='<div class="exp-i"><div class="exp-d">'+(e.desc||e.type||'-')+'</div>';
+      html+='<div class="exp-c">'+(dl||eCur)+'</div></div>';
+      html+='<div class="exp-a"><div class="am">'+fmt(eConv,cur)+'</div>'+eOrig+'</div>';
+      html+='<button class="xbtn" data-action="gen-list-edit" data-idx="'+i+'" style="font-size:15px;color:var(--accent)">&#9999;&#65039;</button>';
+      html+='<button class="xbtn" data-action="gen-list-del" data-idx="'+i+'" data-type="'+e.type+'">x</button>';
       html+='</div>';
     });
     html+='</div>';
   }
+
+  // Day-by-day items section
+  if(dayCats.length){
+    html+='<div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;padding:12px 2px 4px">From Day by Day</div>';
+    if(!dayItems.length){
+      html+='<p style="color:var(--muted);font-size:12px;padding:4px 2px">No matching day expenses yet.</p>';
+    } else {
+      html+='<div class="exp-list">';
+      dayItems.forEach(function(x){
+        var e=x.e,dn=new Date(x.date+'T00:00:00'),eCur=e.cur||cur;
+        var eConv=convertToTrip(e.amt,eCur,cur);
+        var eOrig=(eCur!==cur)?('<div class="as">'+fmt(e.amt,eCur)+'</div>'):'';
+        var dlbl=x.dayIdx>=0?'Day '+(x.dayIdx+1)+' - ':'';
+        html+='<div class="exp-row">';
+        html+='<div class="dot" style="background:'+(CCOLORS[e.cat]||'#7a8fa6')+'"></div>';
+        html+='<div class="exp-i"><div class="exp-d">'+catIcon(e.cat)+' '+(e.desc||e.cat)+'</div>';
+        html+='<div class="exp-c">'+dlbl+dn.toLocaleDateString('en-US',{month:'short',day:'numeric'})+'</div></div>';
+        html+='<div class="exp-a"><div class="am">'+fmt(eConv,cur)+'</div>'+eOrig+'</div>';
+        html+='<button class="xbtn" data-action="gen-list-edit-day" data-date="'+x.date+'" data-idx="'+x.ei+'" data-dayidx="'+(x.dayIdx>=0?x.dayIdx:0)+'" style="font-size:15px;color:var(--accent)">&#9999;&#65039;</button>';
+        html+='<button class="xbtn" data-action="gen-list-del-day" data-date="'+x.date+'" data-idx="'+x.ei+'" data-type="'+type+'">x</button>';
+        html+='</div>';
+      });
+      html+='</div>';
+    }
+  }
+
   document.getElementById('GEN_LIST_BODY').innerHTML=html;
 }
 
