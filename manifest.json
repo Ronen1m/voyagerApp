@@ -10,15 +10,15 @@
   "theme_color": "#0f1923",
   "icons": [
     {
-      "src": "icons/icon-192.png",
-      "sizes": "192x192",
+      "src": "https://cdn.jsdelivr.net/npm/twemoji@14.0.2/assets/72x72/2708.png",
+      "sizes": "72x72",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
     },
     {
-      "src": "icons/icon-512.png",
+      "src": "https://cdn.jsdelivr.net/npm/twemoji@14.0.2/assets/svg/2708.svg",
       "sizes": "512x512",
-      "type": "image/png",
+      "type": "image/svg+xml",
       "purpose": "any maskable"
     }
   ]
