@@ -1,15 +1,16 @@
 {
-  "id": "/voyagerApp/",
+  "id": "com.ronen1m.voyager",
   "name": "Voyager Expenses",
   "short_name": "Voyager",
   "description": "Travel expense tracker",
   "start_url": "/voyagerApp/index.html",
   "scope": "/voyagerApp/",
   "display": "fullscreen",
+  "display_override": ["fullscreen", "standalone", "minimal-ui"],
   "orientation": "portrait",
   "background_color": "#0f1923",
   "theme_color": "#0f1923",
-  "categories": ["finance", "travel", "utilities"],
+  "categories": ["finance", "travel"],
   "icons": [
     {
       "src": "icons/icon-192.png",
