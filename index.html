@@ -137,6 +137,22 @@ body{background:var(--bg);color:var(--text);font-family:var(--fb);min-height:100
 .cat-bar-bg{height:5px;border-radius:3px;background:var(--surf2);overflow:hidden}
 .cat-bar-fill{height:100%;border-radius:3px}
 .rate-note{background:rgba(45,212,160,0.08);border:1px solid rgba(45,212,160,0.2);border-radius:10px;padding:10px 12px;font-size:12px;color:var(--green);margin-bottom:12px}
+.flight-box{background:var(--surf);border:1px solid rgba(59,130,246,0.4);border-radius:14px;padding:14px;margin-bottom:14px}
+.flight-box-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.flight-box-title{font-family:var(--fh);font-size:14px;font-weight:700;display:flex;align-items:center;gap:6px}
+.flight-refresh{background:rgba(59,130,246,0.15);border:1px solid rgba(59,130,246,0.3);border-radius:8px;padding:5px 10px;color:#60a5fa;font-size:11px;cursor:pointer;font-family:var(--fh);font-weight:600}
+.flight-status-badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;font-family:var(--fh)}
+.flight-status-badge.on-time{background:rgba(45,212,160,0.15);color:var(--green);border:1px solid rgba(45,212,160,0.3)}
+.flight-status-badge.delayed{background:rgba(240,82,82,0.15);color:var(--red);border:1px solid rgba(240,82,82,0.3)}
+.flight-status-badge.unknown{background:rgba(122,143,166,0.15);color:var(--muted);border:1px solid var(--border)}
+.flight-status-badge.cancelled{background:rgba(240,82,82,0.2);color:var(--red);border:1px solid rgba(240,82,82,0.4)}
+.flight-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.flight-cell{background:var(--surf2);border-radius:9px;padding:9px 11px}
+.flight-cell .fc-label{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px}
+.flight-cell .fc-val{font-family:var(--fh);font-size:13px;font-weight:700}
+.flight-cell .fc-sub{font-size:10px;color:var(--muted);margin-top:2px}
+.flight-loading{text-align:center;padding:20px;color:var(--muted);font-size:13px}
+.flight-error{text-align:center;padding:12px;color:var(--muted);font-size:12px;font-style:italic}
 .empty{text-align:center;padding:60px 20px;color:var(--muted)}
 .empty .ei{font-size:52px;margin-bottom:14px}
 .empty p{font-size:13px;line-height:1.6}
@@ -452,6 +468,135 @@ function renderHome(){
   el.innerHTML=html;
 }
 
+// ══════════════════════ FLIGHT STATUS ══════════════════════
+var AVIATION_KEY = 'a9ba771807a9907aa5ae5261cd78529b';
+
+function extractFlightNumber(desc) {
+  if (!desc) return null;
+  // Match patterns like LY317, EL AL 317, WIZZ 456, W6 1234, AA 100
+  var patterns = [
+    /\b([A-Z]{2,3})\s*(\d{1,4})\b/i,   // WIZZ 456 or LY317
+    /\b([A-Z]{1,2}\d{1,2})\s*(\d{1,4})\b/i  // W6 1234
+  ];
+  desc = desc.trim();
+  for (var i = 0; i < patterns.length; i++) {
+    var m = desc.match(patterns[i]);
+    if (m) {
+      var code = m[1].replace(/\s/g,'').toUpperCase();
+      var num = m[2];
+      return code + num;
+    }
+  }
+  return null;
+}
+
+function getFlightDate(trip, flightEntry) {
+  // Use dateFrom if set, else trip start date
+  return flightEntry.dateFrom || trip.start || null;
+}
+
+function renderFlightBoxes() {
+  var t = getTrip(curTripId);
+  if (!t) return;
+  var flights = (t.gen || []).filter(function(e) { return e.type === 'flight'; });
+  var container = document.getElementById('FLIGHT_BOXES');
+  if (!container) return;
+  if (!flights.length) { container.innerHTML = ''; return; }
+
+  var html = '';
+  flights.forEach(function(e, i) {
+    var fn = extractFlightNumber(e.desc || '');
+    if (!fn) return;
+    var fd = getFlightDate(t, e);
+    var boxId = 'FB_' + i;
+    var cached = flightCache[fn + '_' + (fd || '')];
+    html += '<div class="flight-box" id="' + boxId + '">';
+    html += '<div class="flight-box-head">';
+    html += '<div class="flight-box-title">✈️ ' + fn + (e.desc && e.desc !== fn ? ' <span style="font-size:11px;color:var(--muted);font-weight:400">· ' + e.desc + '</span>' : '') + '</div>';
+    html += '<button class="flight-refresh" data-action="refresh-flight" data-fn="' + fn + '" data-date="' + (fd||'') + '" data-box="' + boxId + '">↻ Refresh</button>';
+    html += '</div>';
+    if (cached) {
+      html += renderFlightData(cached);
+    } else {
+      html += '<div class="flight-error">Tap Refresh to load live flight data</div>';
+    }
+    html += '</div>';
+  });
+  container.innerHTML = html;
+}
+
+var flightCache = {};
+
+function refreshFlight(fn, date, boxId) {
+  var box = document.getElementById(boxId);
+  if (!box) return;
+  box.querySelector('.flight-refresh').textContent = '⟳ Loading...';
+  var url = 'https://api.aviationstack.com/v1/flights?access_key=' + AVIATION_KEY + '&flight_iata=' + encodeURIComponent(fn);
+  if (date) url += '&flight_date=' + date;
+  fetch(url)
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      var flight = data.data && data.data[0];
+      flightCache[fn + '_' + date] = flight || null;
+      var inner = box.querySelector('.flight-refresh').parentElement.nextElementSibling;
+      if (flight) {
+        // Replace content after header
+        var head = box.querySelector('.flight-box-head');
+        head.nextSibling && head.parentNode.removeChild(head.nextSibling);
+        var div = document.createElement('div');
+        div.innerHTML = renderFlightData(flight);
+        while (div.firstChild) box.appendChild(div.firstChild);
+      } else {
+        var head2 = box.querySelector('.flight-box-head');
+        var err = document.createElement('div');
+        err.className = 'flight-error';
+        err.textContent = 'No flight data found for ' + fn;
+        if (head2.nextSibling) box.replaceChild(err, head2.nextSibling);
+        else box.appendChild(err);
+      }
+      box.querySelector('.flight-refresh').textContent = '↻ Refresh';
+    })
+    .catch(function() {
+      box.querySelector('.flight-refresh').textContent = '↻ Refresh';
+      toast('Could not fetch flight data');
+    });
+}
+
+function renderFlightData(f) {
+  if (!f) return '<div class="flight-error">No data available</div>';
+  var status = (f.flight_status || 'unknown').toLowerCase();
+  var badgeClass = status === 'active' || status === 'landed' ? 'on-time' : status === 'cancelled' ? 'cancelled' : status.indexOf('delay') >= 0 ? 'delayed' : 'unknown';
+  var statusLabel = {active:'In Air',landed:'Landed',scheduled:'Scheduled',cancelled:'Cancelled',incident:'Incident',diverted:'Diverted'}[status] || status.charAt(0).toUpperCase()+status.slice(1);
+
+  var dep = f.departure || {};
+  var arr = f.arrival || {};
+  var airline = (f.airline && f.airline.name) || '';
+
+  function fmtTime(iso) {
+    if (!iso) return '—';
+    var d = new Date(iso);
+    return d.toLocaleTimeString('en-US', {hour:'2-digit', minute:'2-digit', hour12:false});
+  }
+  function fmtDelay(mins) {
+    if (!mins || mins === 0) return '';
+    return ' <span style="color:var(--red);font-size:10px">+' + mins + 'm</span>';
+  }
+
+  var html = '';
+  html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">';
+  html += '<span class="flight-status-badge ' + badgeClass + '">' + statusLabel + '</span>';
+  if (airline) html += '<span style="font-size:11px;color:var(--muted)">' + airline + '</span>';
+  html += '</div>';
+  html += '<div class="flight-grid">';
+  html += '<div class="flight-cell"><div class="fc-label">Departure</div><div class="fc-val">' + (dep.iata||'—') + fmtDelay(dep.delay) + '</div><div class="fc-sub">' + fmtTime(dep.estimated||dep.scheduled) + (dep.terminal?' · T'+dep.terminal:'') + (dep.gate?' · Gate '+dep.gate:'') + '</div></div>';
+  html += '<div class="flight-cell"><div class="fc-label">Arrival</div><div class="fc-val">' + (arr.iata||'—') + fmtDelay(arr.delay) + '</div><div class="fc-sub">' + fmtTime(arr.estimated||arr.scheduled) + (arr.terminal?' · T'+arr.terminal:'') + (arr.gate?' · Gate '+arr.gate:'') + '</div></div>';
+  if (dep.delay && dep.delay > 0) {
+    html += '<div class="flight-cell" style="grid-column:span 2;background:rgba(240,82,82,0.08);border:1px solid rgba(240,82,82,0.2)"><div class="fc-label">Delay</div><div class="fc-val" style="color:var(--red)">' + dep.delay + ' minutes</div></div>';
+  }
+  html += '</div>';
+  return html;
+}
+
 function renderDetail(){
   var t=getTrip(curTripId);
   if(!t)return;
@@ -461,7 +606,7 @@ function renderDetail(){
   var s1=secAmt(tot,cur),s2=secAmt(gen,cur),s3=dd.length>0?secAmt(pd,cur):'';
 
   // General tab
-  var tabG='<div class="sec-title">General Expenses <span class="badge">'+(t.gen||[]).length+'</span></div>';
+  var tabG='<div id="FLIGHT_BOXES"></div><div class="sec-title">General Expenses <span class="badge">'+(t.gen||[]).length+'</span></div>';
   tabG+='<div class="gcards">';
   // Map: which day-expense categories roll up into each general type
   var DAY_ROLLUP={gas:['gas'],restaurant:['food'],groceries:['supermarket'],attractions:['activities'],hotel:['hotel'],flight:[],car:['transport'],insurance:[],visa:[],other:['other','shopping']};
@@ -601,6 +746,7 @@ function renderDetail(){
   html+='<div class="tabpane" id="TP_cats">'+tabC+'</div>';
   html+='</div>';
   document.getElementById('detail-wrap').innerHTML=html;
+  renderFlightBoxes();
 }
 
 function goHome(){
@@ -1058,6 +1204,7 @@ document.addEventListener('click',function(e){
     if(a==='del'){if(confirm('Delete this trip? This cannot be undone.')){trips=trips.filter(function(t){return t.id!==el.dataset.id;});save();renderHome();toast('Deleted');}return;}
     if(a==='go-home'){goHome();return;}
     if(a==='export'){exportCSV(curTripId);return;}
+    if(a==='refresh-flight'){refreshFlight(el.dataset.fn,el.dataset.date,el.dataset.box);return;}
     if(a==='tab'){
       document.querySelectorAll('.tab').forEach(function(t){t.classList.remove('on');});
       document.querySelectorAll('.tabpane').forEach(function(t){t.classList.remove('on');});
