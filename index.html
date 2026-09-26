@@ -137,8 +137,13 @@ body{background:var(--bg);color:var(--text);font-family:var(--fb);min-height:100
 .cat-bar-bg{height:5px;border-radius:3px;background:var(--surf2);overflow:hidden}
 .cat-bar-fill{height:100%;border-radius:3px}
 .rate-note{background:rgba(45,212,160,0.08);border:1px solid rgba(45,212,160,0.2);border-radius:10px;padding:10px 12px;font-size:12px;color:var(--green);margin-bottom:12px}
-.flight-box{background:var(--surf);border:1px solid rgba(59,130,246,0.4);border-radius:14px;padding:14px;margin-bottom:14px}
-.flight-box-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.flight-box{background:var(--surf);border:1px solid rgba(59,130,246,0.4);border-radius:14px;padding:0;margin-bottom:10px;overflow:hidden}
+.flight-box-head{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;cursor:pointer;user-select:none}
+.flight-box-head:active{background:rgba(255,255,255,0.03)}
+.flight-box-body{display:none;padding:0 14px 14px;border-top:1px solid rgba(59,130,246,0.2)}
+.flight-box.open .flight-box-body{display:block}
+.flight-box-chevron{color:var(--muted);font-size:16px;transition:transform .2s;flex-shrink:0}
+.flight-box.open .flight-box-chevron{transform:rotate(90deg)}
 .flight-box-title{font-family:var(--fh);font-size:14px;font-weight:700;display:flex;align-items:center;gap:6px}
 .flight-refresh{background:rgba(59,130,246,0.15);border:1px solid rgba(59,130,246,0.3);border-radius:8px;padding:5px 10px;color:#60a5fa;font-size:11px;cursor:pointer;font-family:var(--fh);font-weight:600}
 .flight-status-badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;font-family:var(--fh)}
@@ -471,33 +476,39 @@ function renderHome(){
 // ══════════════════════ FLIGHT STATUS ══════════════════════
 var RAPIDAPI_KEY = '6a114f8ae9msha12c81ad081be97p195c95jsn26979ea2918c';
 
+function extractFlightNumbers(desc) {
+  // Returns array of all flight numbers found in description
+  if (!desc) return [];
+  var upper = desc.trim().toUpperCase();
+  var results = [];
+  var used = [];
+  var nameMap = {
+    'WIZZ':'W6','WIZZAIR':'W6','ELAL':'LY','RYANAIR':'FR',
+    'EASYJET':'U2','LUFTHANSA':'LH','EMIRATES':'EK',
+    'TURKISH':'TK','DELTA':'DL','AMERICAN':'AA','UNITED':'UA',
+    'KLMAIR':'KL','AIRFRANCE':'AF','BRITISH':'BA'
+  };
+  // Find all IATA patterns: LY317, LY 317, W6 1234
+  var re = /\b([A-Z]{1,3}\d{0,1})\s*(\d{1,4})\b/g;
+  var m;
+  while((m = re.exec(upper)) !== null) {
+    var fn = m[1].replace(/\s/g,'') + m[2];
+    if(used.indexOf(fn) < 0) { results.push(fn); used.push(fn); }
+  }
+  // Also find named airlines: WIZZ 456
+  var re2 = /\b([A-Z]{3,})\s+(\d{1,4})\b/g;
+  while((m = re2.exec(upper)) !== null) {
+    var code = nameMap[m[1]] || m[1].slice(0,2);
+    var fn2 = code + m[2];
+    if(used.indexOf(fn2) < 0) { results.push(fn2); used.push(fn2); }
+  }
+  return results;
+}
+
 function extractFlightNumber(desc) {
-  if (!desc) return null;
-  desc = desc.trim().toUpperCase();
-  // Pattern 1: Standard IATA: LY5247, LY 5247, W6 1234, W61234
-  var m1 = desc.match(/\b([A-Z]{2}|[A-Z]\d)\s*(\d{1,4})\b/);
-  if (m1) return m1[1] + m1[2];
-  // Pattern 2: 3-letter code: WIZ 456 or WIZZ 456
-  var m2 = desc.match(/\b([A-Z]{3,})\s*(\d{1,4})\b/);
-  if (m2) {
-    var nameMap = {
-      'WIZZ':'W6','WIZZAIR':'W6','ELAL':'LY','RYANAIR':'FR',
-      'EASYJET':'U2','LUFTHANSA':'LH','EMIRATES':'EK',
-      'TURKISH':'TK','DELTA':'DL','AMERICAN':'AA','UNITED':'UA',
-      'KLMAIR':'KL','AIRFRANCE':'AF','BRITISH':'BA'
-    };
-    var code = nameMap[m2[1]] || m2[1].slice(0,2);
-    return code + m2[2];
-  }
-  // Pattern 3: Two words like "EL AL 317"
-  var m3 = desc.match(/\b([A-Z]+)\s+([A-Z]+)\s+(\d{1,4})\b/);
-  if (m3) {
-    var nameMap2 = {'EL AL':'LY','AIR FRANCE':'AF','BRITISH AIRWAYS':'BA','KLM ROYAL':'KL'};
-    var twoWord = m3[1]+' '+m3[2];
-    var code2 = nameMap2[twoWord] || (m3[1].slice(0,1)+m3[2].slice(0,1));
-    return code2 + m3[3];
-  }
-  return null;
+  // Legacy single-flight helper
+  var arr = extractFlightNumbers(desc);
+  return arr.length ? arr[0] : null;
 }
 
 function getFlightDate(trip, flightEntry) {
@@ -519,25 +530,38 @@ function renderFlightBoxes() {
   if (!flights.length) { container.innerHTML = ''; return; }
 
   var html = '';
-  flights.forEach(function(e, i) {
-    var fn = extractFlightNumber(e.desc || '');
-    if (!fn) return;
-    var fd = getFlightDate(t, e);
-    var boxId = 'FB_' + i;
-    var cached = flightCache[fn + '_' + (fd || '')];
-    html += '<div class="flight-box" id="' + boxId + '">';
-    html += '<div class="flight-box-head">';
-    html += '<div class="flight-box-title">✈️ ' + fn + (e.desc && e.desc !== fn ? ' <span style="font-size:11px;color:var(--muted);font-weight:400">· ' + e.desc + '</span>' : '') + '</div>';
-    html += '<button class="flight-refresh" data-action="refresh-flight" data-fn="' + fn + '" data-date="' + (fd||'') + '" data-box="' + boxId + '">↻ Refresh</button>';
-    html += '</div>';
-    if (cached) {
-      html += renderFlightData(cached);
-    } else {
-      html += '<div class="flight-error">Tap Refresh to load live flight data</div>';
-    }
-    html += '</div>';
+  flights.forEach(function(e, ei) {
+    var fns = extractFlightNumbers(e.desc || '');
+    if (!fns.length) return;
+
+    fns.forEach(function(fn, fi) {
+      var fd = fi === 0 ? (e.dateFrom || t.start || '') : (e.dateTo || t.end || '');
+      var label = fi === 0 ? '✈️ Outbound' : '🔄 Return';
+      var boxId = 'FB_' + ei + '_' + fi;
+      var cached = flightCache[fn + '_' + (fd || '')];
+      var dateStr = fd ? ' <span style="font-size:10px;color:var(--muted);font-weight:400">· ' + fdate(fd) + '</span>' : '';
+      var statusDot = cached ? (cached.status === 'cancelled' ? ' 🔴' : cached.status === 'delayed' ? ' 🟡' : cached.status === 'landed' ? ' ✅' : ' 🔵') : '';
+
+      html += '<div class="flight-box" id="' + boxId + '">';
+      // Collapsible header - click to expand
+      html += '<div class="flight-box-head" data-action="toggle-flight" data-box="' + boxId + '">';
+      html += '<div class="flight-box-title">' + label + ' · <span style="color:#60a5fa">' + fn + '</span>' + statusDot + dateStr + '</div>';
+      html += '<div style="display:flex;align-items:center;gap:8px">';
+      html += '<button class="flight-refresh" data-action="refresh-flight" data-fn="' + fn + '" data-date="' + (fd||'') + '" data-box="' + boxId + '">↻</button>';
+      html += '<span class="flight-box-chevron">›</span>';
+      html += '</div></div>';
+      // Collapsible body
+      html += '<div class="flight-box-body" id="FBB_' + boxId + '">';
+      if (cached) {
+        html += renderFlightDataSimple(cached);
+      } else {
+        html += '<div class="flight-error" style="padding:12px 0">Tap ↻ to load live flight data</div>';
+      }
+      html += '</div>';
+      html += '</div>';
+    });
   });
-  container.innerHTML = html;
+  container.innerHTML = html || '';
 }
 
 var flightCache = {};
@@ -597,12 +621,19 @@ function refreshFlight(fn, date, boxId) {
 }
 
 function updateFlightBox(box, fn, flight) {
-  var head = box.querySelector('.flight-box-head');
-  // Remove old content after header
-  while (head.nextSibling) box.removeChild(head.nextSibling);
-  var div = document.createElement('div');
-  div.innerHTML = renderFlightDataSimple(flight);
-  while (div.firstChild) box.appendChild(div.firstChild);
+  var body = box.querySelector('.flight-box-body');
+  if (body) {
+    body.innerHTML = renderFlightDataSimple(flight);
+  }
+  // Auto-open after refresh
+  box.classList.add('open');
+  // Update status dot in title
+  var titleEl = box.querySelector('.flight-box-title');
+  if (titleEl) {
+    var dot = flight.status === 'cancelled' ? ' 🔴' : flight.status === 'delayed' ? ' 🟡' : flight.status === 'landed' ? ' ✅' : ' 🔵';
+    // Remove old dot and add new
+    titleEl.innerHTML = titleEl.innerHTML.replace(/ [🔴🟡✅🔵]/g, '') + dot;
+  }
 }
 
 function renderFlightDataSimple(f) {
@@ -1305,7 +1336,16 @@ document.addEventListener('click',function(e){
     if(a==='del'){if(confirm('Delete this trip? This cannot be undone.')){trips=trips.filter(function(t){return t.id!==el.dataset.id;});save();renderHome();toast('Deleted');}return;}
     if(a==='go-home'){goHome();return;}
     if(a==='export'){exportCSV(curTripId);return;}
-    if(a==='refresh-flight'){refreshFlight(el.dataset.fn,el.dataset.date,el.dataset.box);return;}
+    if(a==='refresh-flight'){
+      // Stop propagation so the expand/collapse doesn't fire
+      e.stopPropagation();
+      refreshFlight(el.dataset.fn,el.dataset.date,el.dataset.box);return;
+    }
+    if(a==='toggle-flight'){
+      var fb=document.getElementById(el.dataset.box);
+      if(fb)fb.classList.toggle('open');
+      return;
+    }
     if(a==='tab'){
       document.querySelectorAll('.tab').forEach(function(t){t.classList.remove('on');});
       document.querySelectorAll('.tabpane').forEach(function(t){t.classList.remove('on');});
