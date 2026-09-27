@@ -209,7 +209,14 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(.5)}
     <div class="field"><label>Description (optional)</label><textarea id="F_TDESC" rows="3" placeholder="e.g. Summer road trip through Italy"></textarea></div>
     <div class="field">
       <label>Icon Preview</label>
-      <div class="preview-box"><div class="preview-icon" id="F_PREV">✈️</div><div class="preview-text">Choose emoji &amp; color below</div></div>
+      <div class="preview-box">
+        <div class="preview-icon" id="F_PREV" style="overflow:hidden;position:relative">✈️</div>
+        <div>
+          <div class="preview-text">Choose emoji &amp; color below</div>
+          <button type="button" id="B_UPLOAD_ICON" style="margin-top:8px;background:var(--surf2);border:1px solid var(--border);border-radius:8px;padding:6px 12px;color:var(--text);font-family:var(--fb);font-size:12px;cursor:pointer">📷 Upload Photo</button>
+          <button type="button" id="B_CLEAR_ICON" style="display:none;margin-top:8px;margin-left:6px;background:transparent;border:1px solid var(--border);border-radius:8px;padding:6px 10px;color:var(--muted);font-family:var(--fb);font-size:12px;cursor:pointer">✕ Remove</button>
+        </div>
+      </div>
     </div>
     <div class="field"><label>Emoji</label><div class="emoji-wrap" id="F_EMOJIS"></div></div>
     <div class="field"><label>Background Color</label><div class="color-wrap" id="F_COLORS"></div></div>
@@ -226,6 +233,7 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(.5)}
     </div>
   </div>
 </div>
+<input type="file" id="F_ICON_IMAGE" accept="image/*" style="display:none">
 
 <div class="overlay" id="OVL_SETTINGS">
   <div class="sheet">
@@ -377,7 +385,7 @@ function sGet(k){try{return localStorage.getItem(k);}catch(e){return _mem[k]||nu
 function sSet(k,v){try{localStorage.setItem(k,v);}catch(e){_mem[k]=v;}}
 
 var trips=[],settings={sec:"",rates:{}};var sortAsc=false;
-var curTripId=null,editTripId=null,curDay=null,editGenIdx=-1,editExpIdx=-1;
+var curTripId=null,editTripId=null,curDay=null,editGenIdx=-1,editExpIdx=-1,pickImage=null;
 var pickEmoji=EMOJIS[0],pickColor=DEF_COLOR;
 
 function load(){
@@ -453,7 +461,9 @@ function renderHome(){
     var bg=t.color||DEF_COLOR;
     html+='<div class="trip-card" data-id="'+t.id+'">';
     html+='<div class="trip-head" data-action="toggle" data-id="'+t.id+'">';
-    html+='<div class="trip-icon" style="background:'+bg+'">'+t.emoji+'</div>';
+    var iconStyle=t.iconImage?'background:url('+t.iconImage+') center/cover no-repeat':'background:'+bg;
+    var iconContent=t.iconImage?'':t.emoji;
+    html+='<div class="trip-icon" style="'+iconStyle+';">'+iconContent+'</div>';
     html+='<div class="trip-info"><div class="trip-name">'+t.name+'</div>';
     html+='<div class="trip-sub">'+(t.start?fdate(t.start)+' to '+fdate(t.end):'No dates')+' · '+nd+' days</div></div>';
     html+='<div class="trip-amt"><div class="big">'+fmt(tot,cur)+'</div>'+(s1?'<div class="small">'+s1+'</div>':'')+'<div class="small">total</div></div>';
@@ -573,50 +583,41 @@ function refreshFlight(fn, date, boxId) {
   refreshBtn.textContent = '⟳ Loading...';
   refreshBtn.disabled = true;
 
-  // Use Claude API with web search to get real flight data
+  // Claude API with web search - live accurate data (~5 sec)
   var searchDate = date || toDateStr(new Date());
   fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({
       model: 'claude-sonnet-4-6',
-      max_tokens: 1000,
+      max_tokens: 600,
       tools: [{type: 'web_search_20250305', name: 'web_search'}],
       messages: [{
         role: 'user',
-        content: 'Search for the current flight status of flight ' + fn + ' on ' + searchDate + '. Find all available details. Return ONLY a JSON object with exactly these fields: {"status":"scheduled/active/landed/cancelled/delayed","airline":"name","dep_airport":"full airport name","dep_iata":"XXX","dep_country":"Country Name","dep_time":"HH:MM","dep_terminal":"1","dep_gate":"A1","dep_counter":"check-in counter or desk number if available, else null","dep_delay":0,"arr_airport":"full airport name","arr_iata":"XXX","arr_country":"Country Name","arr_time":"HH:MM","arr_terminal":"1","arr_gate":"B2","arr_delay":0,"note":""}. Use null for unknown fields. Always include the country for both departure and arrival airports.'
+        content: 'Search for live flight status of ' + fn + ' on ' + searchDate + '. Find: departure airport, arrival airport, scheduled time, terminal, gate, check-in counters, delay. Return ONLY this JSON (no other text): {"status":"scheduled/active/landed/cancelled/delayed","airline":"","dep_airport":"","dep_iata":"","dep_country":"","dep_time":"HH:MM","dep_terminal":null,"dep_gate":null,"dep_counters":null,"dep_delay":0,"arr_airport":"","arr_iata":"","arr_country":"","arr_time":"HH:MM","arr_terminal":null,"arr_gate":null,"arr_delay":0,"note":""}'
       }]
     })
   })
-  .then(function(r) { return r.json(); })
-  .then(function(data) {
-    var text = '';
-    if(data.content) {
-      data.content.forEach(function(block) {
-        if(block.type === 'text') text += block.text;
-      });
-    }
-    if(!text) throw new Error('No response');
-    var jsonMatch = text.match(/\{[\s\S]*?\}/);
-    if(!jsonMatch) throw new Error('No JSON in response');
-    var flight = JSON.parse(jsonMatch[0]);
-    flightCache[fn + '_' + (date||'')] = flight;
-    updateFlightBox(box, fn, flight);
-    refreshBtn.textContent = '↻ Refresh';
-    refreshBtn.disabled = false;
+  .then(function(r){return r.json();})
+  .then(function(data){
+    var text='';
+    (data.content||[]).forEach(function(b){if(b.type==='text')text+=b.text;});
+    var m=text.match(/\{[\s\S]*\}/);
+    if(!m) throw new Error('No JSON');
+    var flight=JSON.parse(m[0]);
+    if(flight.dep_delay>0) flight.status='delayed';
+    flightCache[fn+'_'+(date||'')]=flight;
+    updateFlightBox(box,fn,flight);
+    refreshBtn.textContent='↻ Refresh';
+    refreshBtn.disabled=false;
   })
-  .catch(function(e) {
-    console.log('Flight fetch error:', e);
-    refreshBtn.textContent = '↻ Refresh';
-    refreshBtn.disabled = false;
-    // Show error in box
-    var head = box.querySelector('.flight-box-head');
-    var err = document.createElement('div');
-    err.className = 'flight-error';
-    err.textContent = 'Could not fetch flight data. Check your connection.';
-    var existing = head.nextElementSibling;
-    if (existing) box.replaceChild(err, existing);
-    else box.appendChild(err);
+  .catch(function(e){
+    console.log('Flight fetch error:',e);
+    refreshBtn.textContent='↻ Refresh';
+    refreshBtn.disabled=false;
+    var body=box.querySelector('.flight-box-body');
+    if(body) body.innerHTML='<div class="flight-error">Could not fetch flight data. Try again.</div>';
+    box.classList.add('open');
   });
 }
 
@@ -925,7 +926,23 @@ function buildPickers(){
   COLORS.forEach(function(c){ch+='<div class="cpick'+(c===pickColor?' sel':'')+'" data-action="pick-color" data-color="'+c+'" style="background:'+c+'"></div>';});
   document.getElementById('F_COLORS').innerHTML=ch;
 }
-function updatePreview(){var p=document.getElementById('F_PREV');p.style.background=pickColor;p.textContent=pickEmoji;}
+function updatePreview(){
+  var p=document.getElementById('F_PREV');
+  var clearBtn=document.getElementById('B_CLEAR_ICON');
+  if(pickImage){
+    p.style.background='none';
+    p.style.backgroundImage='url('+pickImage+')';
+    p.style.backgroundSize='cover';
+    p.style.backgroundPosition='center';
+    p.textContent='';
+    if(clearBtn)clearBtn.style.display='inline-block';
+  } else {
+    p.style.background=pickColor;
+    p.style.backgroundImage='none';
+    p.textContent=pickEmoji;
+    if(clearBtn)clearBtn.style.display='none';
+  }
+}
 
 function saveTrip(){
   var name=document.getElementById('F_TNAME').value.trim();
@@ -937,13 +954,13 @@ function saveTrip(){
   if(start&&end&&end<start){toast('End must be after start');return;}
   if(editTripId){
     var t=getTrip(editTripId);
-    t.name=name;t.desc=desc;t.start=start;t.end=end;t.cur=cur;t.emoji=pickEmoji;t.color=pickColor;
+    t.name=name;t.desc=desc;t.start=start;t.end=end;t.cur=cur;t.emoji=pickEmoji;t.color=pickColor;t.iconImage=pickImage||null;
     // Clean up day expenses and notes for days no longer in range
     var validDays={};getDays(t).forEach(function(d){validDays[d]=1;});
     if(t.day){Object.keys(t.day).forEach(function(d){if(!validDays[d])delete t.day[d];});}
     if(t.notes){Object.keys(t.notes).forEach(function(d){if(!validDays[d])delete t.notes[d];});}
   } else {
-    trips.push({id:'t'+Date.now(),name:name,desc:desc,start:start,end:end,cur:cur,emoji:pickEmoji,color:pickColor,gen:[],day:{},notes:{}});
+    trips.push({id:'t'+Date.now(),name:name,desc:desc,start:start,end:end,cur:cur,emoji:pickEmoji,color:pickColor,iconImage:pickImage||null,gen:[],day:{},notes:{}});
   }
   save();closeOvl('OVL_TRIP');if(curTripId&&curTripId===editTripId){renderDetail();}renderHome();toast('Trip saved!');
 }
@@ -1390,7 +1407,26 @@ document.getElementById('F_SECCUR').addEventListener('change',function(){updateR
 document.getElementById('F_GTYPE').addEventListener('change',toggleGenDates);
 document.getElementById('F_IMPORT_FILE').addEventListener('change',function(){
   handleImportFile(this.files[0]);
-  this.value=''; // reset so same file can be re-imported
+  this.value='';
+});
+document.getElementById('B_UPLOAD_ICON').addEventListener('click',function(){
+  document.getElementById('F_ICON_IMAGE').click();
+});
+document.getElementById('B_CLEAR_ICON').addEventListener('click',function(){
+  pickImage=null;
+  document.getElementById('F_ICON_IMAGE').value='';
+  updatePreview();
+});
+document.getElementById('F_ICON_IMAGE').addEventListener('change',function(){
+  var file=this.files[0];
+  if(!file)return;
+  var reader=new FileReader();
+  reader.onload=function(ev){
+    pickImage=ev.target.result;
+    updatePreview();
+  };
+  reader.readAsDataURL(file);
+  this.value='';
 });
 
 load();
