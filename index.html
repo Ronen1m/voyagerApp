@@ -1332,6 +1332,8 @@ document.addEventListener('click',function(e){
     }
     if(eid==='B_SORT'){sortAsc=!sortAsc;document.getElementById('B_SORT').textContent=sortAsc?'🔼 Oldest':'🔽 Newest';renderHome();return;}
     if(eid==='B_TRIP_CANCEL'){closeOvl('OVL_TRIP');return;}
+    if(eid==='B_UPLOAD_ICON'){document.getElementById('F_ICON_IMAGE').click();return;}
+    if(eid==='B_CLEAR_ICON'){pickImage=null;document.getElementById('F_ICON_IMAGE').value='';updatePreview();return;}
     if(eid==='B_TRIP_SAVE'){saveTrip();return;}
     if(eid==='B_SET_CANCEL'){closeOvl('OVL_SETTINGS');return;}
     if(eid==='B_SET_SAVE'){saveSettings();return;}
