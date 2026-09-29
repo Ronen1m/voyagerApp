@@ -188,7 +188,7 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(.5)}
     <button class="tbtn" id="B_IMPORT_BTN">📂</button>
     <button class="tbtn" id="B_SETTINGS">⚙️</button>
   </div>
-  <input type="file" id="F_IMPORT_FILE" accept=".json,.csv" style="display:none">
+  <input type="file" id="F_IMPORT_FILE" accept="application/json,text/csv,.json,.csv,*/*" style="display:none">
 </div>
 
 <div class="screen on" id="SCR_HOME">
@@ -392,21 +392,42 @@ var curTripId=null,editTripId=null,curDay=null,editGenIdx=-1,editExpIdx=-1,pickI
 var pickEmoji=EMOJIS[0],pickColor=DEF_COLOR;
 
 function load(){
-  try{var d=sGet('voy3');if(d){var p=JSON.parse(d);trips=p.trips||[];settings=p.settings||{prim:'ILS',sec:'',rates:{}};if(!settings.rates)settings.rates={};if(!settings.prim)settings.prim='ILS';}}catch(e){}
+  try{
+    var d=sGet('voy3');
+    if(d){
+      var p=JSON.parse(d);
+      trips=p.trips||[];
+      settings=p.settings||{prim:'ILS',sec:'',rates:{}};
+      if(!settings.rates)settings.rates={};
+      if(!settings.prim)settings.prim='ILS';
+      // Restore trip images from separate storage
+      trips.forEach(function(t){
+        var img=sGet('voy3_img_'+t.id);
+        if(img)t.iconImage=img;
+      });
+    }
+  }catch(e){console.error('Load failed:',e);}
 }
 function save(){
   try {
-    var data=JSON.stringify({trips:trips,settings:settings});
-    sSet('voy3',data);
+    // Always strip iconImage from localStorage - store separately to avoid quota issues
+    var tripsToSave=trips.map(function(t){
+      var tc={};
+      Object.keys(t).forEach(function(k){if(k!=='iconImage')tc[k]=t[k];});
+      return tc;
+    });
+    sSet('voy3',JSON.stringify({trips:tripsToSave,settings:settings}));
+    // Save images separately per trip
+    trips.forEach(function(t){
+      if(t.iconImage){
+        try{sSet('voy3_img_'+t.id,t.iconImage);}catch(e){}
+      } else {
+        try{localStorage.removeItem('voy3_img_'+t.id);}catch(e){}
+      }
+    });
   } catch(e) {
-    // If storage fails (e.g. quota exceeded by large images), try without images
-    try {
-      var stripped=JSON.stringify({trips:trips.map(function(t){
-        var tc=Object.assign({},t);delete tc.iconImage;return tc;
-      }),settings:settings});
-      sSet('voy3',stripped);
-      console.warn('Saved without images due to storage limit');
-    } catch(e2){ console.error('Save failed:',e2); }
+    console.error('Save failed:',e);
+    toast('Warning: Could not save data!');
   }
 }
 function getTrip(id){for(var i=0;i<trips.length;i++){if(trips[i].id===id)return trips[i];}return null;}
@@ -418,6 +439,17 @@ function secAmt(a,pc){
   var r=parseFloat(settings.rates[pc]||0);
   if(!r)return'';
   return '&#8776;'+sym(settings.sec)+(parseFloat(a)*r).toFixed(2);
+}
+
+// Convert amount to primary currency for display
+function toPrim(a,fromCur){
+  var prim=settings.prim||'ILS';
+  if(!fromCur||fromCur===prim)return parseFloat(a||0);
+  return convertToTrip(a,fromCur,prim);
+}
+function fmtPrim(a,fromCur){
+  var prim=settings.prim||'ILS';
+  return fmt(toPrim(a,fromCur),prim);
 }
 function fdate(d){return new Date(d+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});}
 function toDateStr(d){
@@ -473,8 +505,12 @@ function renderHome(){
   var sorted=trips.slice().sort(function(a,b){var da=a.start||'',db=b.start||'';if(sortAsc)return da>db?1:(da<db?-1:0);return db>da?1:(db<da?-1:0);});
   var html='';
   sorted.forEach(function(t){
-    var tot=tAll(t),cur=t.cur||'USD',nd=getDays(t).length,pd=nd>0?tot/nd:0;
-    var s1=secAmt(tot,cur),s2=secAmt(tGen(t),cur),s3=secAmt(tDay(t),cur),s4=nd>0?secAmt(pd,cur):'';
+    var cur=t.cur||'USD',nd=getDays(t).length;
+    var tot=tAll(t),gen=tGen(t),day=tDay(t),pd=nd>0?tot/nd:0;
+    var prim=settings.prim||'ILS';
+    var totP=toPrim(tot,cur),genP=toPrim(gen,cur),dayP=toPrim(day,cur),pdP=nd>0?toPrim(pd,cur):0;
+    var showPrim=(prim!==cur);
+    var s1=secAmt(tot,cur),s2=secAmt(gen,cur),s3=secAmt(day,cur),s4=nd>0?secAmt(pd,cur):'';
     var bg=t.color||DEF_COLOR;
     html+='<div class="trip-card" data-id="'+t.id+'">';
     html+='<div class="trip-head" data-action="toggle" data-id="'+t.id+'">';
@@ -483,13 +519,21 @@ function renderHome(){
     html+='<div class="trip-icon" style="'+iconStyle+';">'+iconContent+'</div>';
     html+='<div class="trip-info"><div class="trip-name">'+t.name+'</div>';
     html+='<div class="trip-sub">'+(t.start?fdate(t.start)+' to '+fdate(t.end):'No dates')+' · '+nd+' days</div></div>';
-    html+='<div class="trip-amt"><div class="big">'+fmt(tot,cur)+'</div>'+(s1?'<div class="small">'+s1+'</div>':'')+'<div class="small">total</div></div>';
+    html+='<div class="trip-amt">';
+    if(showPrim){
+      html+='<div class="big">'+fmt(totP,prim)+'</div>';
+      html+='<div class="small">'+fmt(tot,cur)+'</div>';
+    } else {
+      html+='<div class="big">'+fmt(tot,cur)+'</div>';
+      if(s1)html+='<div class="small">'+s1+'</div>';
+    }
+    html+='<div class="small">total</div></div>';
     html+='<div class="chev">›</div></div>';
     html+='<div class="trip-body">'+(t.desc?'<div class="trip-desc-text">📝 '+t.desc+'</div>':'');
     html+='<div class="stats3">';
-    html+='<div class="stat"><div class="v">'+fmt(tGen(t),cur)+'</div>'+(s2?'<div class="s">'+s2+'</div>':'')+'<div class="l">General</div></div>';
-    html+='<div class="stat"><div class="v">'+fmt(tDay(t),cur)+'</div>'+(s3?'<div class="s">'+s3+'</div>':'')+'<div class="l">Daily</div></div>';
-    html+='<div class="stat"><div class="v">'+(nd>0?fmt(pd,cur):'—')+'</div>'+(s4?'<div class="s">'+s4+'</div>':'')+'<div class="l">Per Day</div></div>';
+    html+='<div class="stat"><div class="v">'+(showPrim?fmt(genP,prim):fmt(gen,cur))+'</div>'+(showPrim?'<div class="s">'+fmt(gen,cur)+'</div>':(s2?'<div class="s">'+s2+'</div>':''))+'<div class="l">General</div></div>';
+    html+='<div class="stat"><div class="v">'+(showPrim?fmt(dayP,prim):fmt(day,cur))+'</div>'+(showPrim?'<div class="s">'+fmt(day,cur)+'</div>':(s3?'<div class="s">'+s3+'</div>':''))+'<div class="l">Daily</div></div>';
+    html+='<div class="stat"><div class="v">'+(nd>0?(showPrim?fmt(pdP,prim):fmt(pd,cur)):'—')+'</div>'+(nd>0&&showPrim?'<div class="s">'+fmt(pd,cur)+'</div>':(s4?'<div class="s">'+s4+'</div>':''))+'<div class="l">Per Day</div></div>';
     html+='</div>';
     html+='<div class="row3">';
     html+='<button class="tbtn primary" data-action="detail" data-id="'+t.id+'">📋 Details</button>';
