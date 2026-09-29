@@ -189,6 +189,17 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(.5)}
     <button class="tbtn" id="B_SETTINGS">⚙️</button>
   </div>
   <input type="file" id="F_IMPORT_FILE" accept="application/json,text/csv,.json,.csv,*/*" style="display:none">
+  <input type="file" id="F_BANK_FILE" accept=".xlsx,.xls,.csv,*/*" style="display:none">
+</div>
+
+<!-- Bank Import Modal -->
+<div id="BANK_MODAL" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:2000;overflow-y:auto;padding:16px">
+  <div style="max-width:480px;margin:0 auto;background:var(--surf);border-radius:18px;padding:20px">
+    <div style="font-family:var(--fh);font-size:18px;font-weight:800;margin-bottom:4px">📤 Upload Expenses</div>
+    <div id="BANK_SUBTITLE" style="font-size:12px;color:var(--muted);margin-bottom:16px"></div>
+    <div id="BANK_BODY"></div>
+    <div id="BANK_FOOTER" style="display:flex;gap:10px;margin-top:16px;justify-content:flex-end"></div>
+  </div>
 </div>
 
 <div class="screen on" id="SCR_HOME">
@@ -840,7 +851,9 @@ function renderDetail(){
       tabG+='<div class="dot" style="background:'+(CCOLORS[e.type]||'#7a8fa6')+'"></div>';
       tabG+='<div class="exp-i"><div class="exp-d">'+(GTYPES[e.type]?GTYPES[e.type].i:'📦')+' '+(e.desc||e.type)+'</div>';
       var dateLine=(e.dateFrom||e.dateTo)?((e.dateFrom?fdate(e.dateFrom):'?')+' → '+(e.dateTo?fdate(e.dateTo):'?')):'';
-      tabG+='<div class="exp-c">'+(GTYPES[e.type]?GTYPES[e.type].l:'')+(dateLine?' · '+dateLine:'')+'</div></div>';
+      var nightsSuffix='';
+      if(e.type==='hotel'&&e.dateFrom&&e.dateTo){var n=Math.round((new Date(e.dateTo)-new Date(e.dateFrom))/(86400000));if(n>0)nightsSuffix=' ('+n+' night'+(n>1?'s':'')+')';}
+      tabG+='<div class="exp-c">'+(GTYPES[e.type]?GTYPES[e.type].l:'')+(dateLine?' · '+dateLine+nightsSuffix:'')+'</div></div>';
       var eCur=e.cur||cur;
       var eConverted=convertToTrip(e.amt,eCur,cur);
       var eOriginal=(eCur!==cur)?('<div class="as">'+fmt(e.amt,eCur)+'</div>'):'';
@@ -922,7 +935,10 @@ function renderDetail(){
   html+='<div style="font-size:11px;color:var(--muted);margin-top:3px">'+(t.start?fdate(t.start)+' to '+fdate(t.end):'No dates')+' · '+dd.length+' days'+(settings.sec?' · <span style="color:var(--green)">+'+settings.sec+'</span>':'')+'</div>';
   if(t.desc)html+='<div style="font-size:12px;color:var(--muted);font-style:italic;margin-top:4px;line-height:1.4">'+t.desc+'</div>';
   html+='</div></div>';
-  html+='<button class="export-btn" data-action="export">⬇ CSV</button></div></div>';
+  html+='<div style="display:flex;gap:8px;flex-shrink:0">';
+  html+='<button class="export-btn" data-action="export">⬇ CSV</button>';
+  html+='<button class="export-btn" data-action="bank-upload" style="background:var(--orange);color:#fff;border-color:var(--orange)">📤 Upload</button>';
+  html+='</div></div></div>';
   html+='<div style="padding:0 14px">';
   html+='<div class="sumbar">';
   html+='<div><div class="v">'+fmt(tot,cur)+'</div>'+(s1?'<div class="s">'+s1+'</div>':'')+'<div class="l">Total</div></div>';
@@ -1351,16 +1367,18 @@ function exportCSV(id){
   var hdrs=['Trip','Start Date','End Date','Day','Type','Category','Description','Amount','Currency'];
   if(sc)hdrs.push(sc+' approx');
   var rows=[hdrs];
+  var DAY_CAT_LABELS={food:'Food & Drinks',supermarket:'Supermarket',transport:'Transport/Taxi',gas:'Gas/Fuel',hotel:'Accommodation',activities:'Activities',shopping:'Shopping',other:'Other'};
   (t.gen||[]).forEach(function(e){
-    var r=[t.name,t.start||'',t.end||'','General',GTYPES[e.type]?GTYPES[e.type].l:e.type,e.desc||'',e.amt,e.cur||cur];
+    var r=[t.name,t.start||'',t.end||'','General',GTYPES[e.type]?GTYPES[e.type].l:e.type,'',e.desc||'',e.amt,e.cur||cur];
     if(sc){var rt=parseFloat(settings.rates[e.cur||cur]||0);r.push(rt?(e.amt*rt).toFixed(2):'');}
     rows.push(r);
   });
   getDays(t).forEach(function(d,i){
     var note=(t.notes||{})[d];
-    if(note){var r=[t.name,t.start||'',t.end||'','Day '+(i+1),'Notes','',note,'',''];if(sc)r.push('');rows.push(r);}
+    if(note){var r=[t.name,t.start||'',t.end||'','Day '+(i+1),d,'Notes',note,'',''];if(sc)r.push('');rows.push(r);}
     ((t.day||{})[d]||[]).forEach(function(e){
-      var r=[t.name,t.start||'',t.end||'','Day '+(i+1),d,e.cat,e.desc||'',e.amt,e.cur||cur];
+      var catLabel=DAY_CAT_LABELS[e.cat]||(e.cat||'');
+      var r=[t.name,t.start||'',t.end||'','Day '+(i+1),d,catLabel,e.desc||'',e.amt,e.cur||cur];
       if(sc){var rt=parseFloat(settings.rates[e.cur||cur]||0);r.push(rt?(e.amt*rt).toFixed(2):'');}
       rows.push(r);
     });
@@ -1371,6 +1389,318 @@ function exportCSV(id){
   a.download='VoyagerApp_'+t.name.replace(/\s+/g,'_')+'_'+fileTimestamp()+'.csv';
   a.click();toast('CSV downloaded!');
 }
+
+// ─── Bank / Credit Card Statement Import ───────────────────────────────────
+
+// Hebrew category → app category mapping
+var BANK_CAT_MAP={
+  'מסעדות':'food',
+  'מזון ומשקאות':'supermarket',
+  'מלונאות ואירוח':'hotel',
+  'תחבורה':'transport',
+  'רכב ותחנות דלק':'gas',
+  'דלק':'gas',
+  'פנאי בילוי':'activities',
+  'תיירות':'activities',
+  'קניות':'shopping',
+  'אופנה':'shopping',
+  'ביגוד והנעלה':'shopping',
+  'אלקטרוניקה ומחשבים':'shopping',
+  'תקשורת ומחשבים':'other',
+  'ביטוח ופיננסים':'other',
+  'ריהוט ובית':'other',
+  'טיפוח ויופי':'other',
+  'בריאות ורפואה':'other',
+  'חינוך':'other',
+  'ממשלה ורשויות':'other'
+};
+
+var _bankPending=[];   // items awaiting user review
+var _bankConfirmed=[];  // items ready to import
+var _bankTripId=null;
+var _bankCur='ILS';
+
+function openBankUpload(tripId){
+  _bankTripId=tripId;
+  var t=getTrip(tripId);
+  _bankCur=t.cur||'ILS';
+  document.getElementById('BANK_SUBTITLE').textContent='Importing into: '+t.name+(t.start?' ('+fdate(t.start)+' – '+fdate(t.end)+')':'');
+  document.getElementById('BANK_BODY').innerHTML='<div style="text-align:center;padding:24px 0"><div style="font-size:40px;margin-bottom:12px">📄</div><div style="color:var(--muted);font-size:14px;margin-bottom:16px">Choose your bank/credit card statement<br><span style="font-size:12px">.xlsx, .xls or .csv files supported</span></div><button id="BANK_CHOOSE_BTN" style="background:var(--orange);color:#fff;border:none;border-radius:12px;padding:12px 28px;font-size:15px;font-weight:700;cursor:pointer">Choose File</button></div>';
+  document.getElementById('BANK_FOOTER').innerHTML='<button id="BANK_CLOSE_BTN" style="background:var(--surf2);border:1px solid var(--border);border-radius:10px;padding:10px 20px;color:var(--text);cursor:pointer">Cancel</button>';
+  document.getElementById('BANK_MODAL').style.display='block';
+  document.getElementById('BANK_CHOOSE_BTN').onclick=function(){document.getElementById('F_BANK_FILE').click();};
+  document.getElementById('BANK_CLOSE_BTN').onclick=closeBankModal;
+}
+
+function closeBankModal(){
+  document.getElementById('BANK_MODAL').style.display='none';
+  _bankPending=[];_bankConfirmed=[];
+  document.getElementById('F_BANK_FILE').value='';
+}
+
+// Parse date value from xlsx (could be Date object, string, or number)
+function parseBankDate(v){
+  if(!v)return null;
+  if(v instanceof Date)return v;
+  if(typeof v==='number'){
+    // Excel serial date
+    var d=new Date(Math.round((v-25569)*86400000));
+    return d;
+  }
+  if(typeof v==='string'){
+    // Try common formats: DD/MM/YYYY, YYYY-MM-DD
+    var p=v.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/);
+    if(p){
+      var y=parseInt(p[3]);if(y<100)y+=2000;
+      return new Date(y,parseInt(p[2])-1,parseInt(p[1]));
+    }
+    return new Date(v);
+  }
+  return null;
+}
+
+function toDateStr2(d){
+  var y=d.getFullYear(),m=d.getMonth()+1,day=d.getDate();
+  return y+'-'+(m<10?'0'+m:m)+'-'+(day<10?'0'+day:day);
+}
+
+function handleBankFile(file){
+  var ext=file.name.split('.').pop().toLowerCase();
+  if(ext==='csv'){
+    var reader=new FileReader();
+    reader.onload=function(ev){parseBankCSV(ev.target.result);};
+    reader.readAsText(file);
+  } else {
+    // xlsx via SheetJS (loaded dynamically)
+    loadSheetJS(function(){
+      var reader=new FileReader();
+      reader.onload=function(ev){
+        var wb=XLSX.read(ev.target.result,{type:'array',cellDates:true});
+        var ws=wb.Sheets[wb.SheetNames[0]];
+        var rows=XLSX.utils.sheet_to_json(ws,{header:1,raw:false,dateNF:'YYYY-MM-DD'});
+        parseBankRows(rows);
+      };
+      reader.readAsArrayBuffer(file);
+    });
+  }
+}
+
+function loadSheetJS(cb){
+  if(window.XLSX){cb();return;}
+  var s=document.createElement('script');
+  s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+  s.onload=cb;
+  document.head.appendChild(s);
+}
+
+function parseBankCSV(text){
+  var lines=text.split('\n').map(function(l){return l.trim();}).filter(Boolean);
+  var rows=lines.map(function(l){
+    return l.split(',').map(function(c){return c.replace(/^"|"$/g,'').trim();});
+  });
+  parseBankRows(rows);
+}
+
+// Detect which column layout this sheet uses and extract rows
+function parseBankRows(rows){
+  var t=getTrip(_bankTripId);
+  if(!t||!t.start){showBankError('Trip has no dates set. Please set trip dates first.');return;}
+
+  var tripStart=new Date(t.start+'T00:00:00');
+  var tripEnd=new Date(t.end+'T23:59:59');
+
+  // Find header row: look for a row with a date-like column + merchant name column
+  var dataStart=-1;
+  var colDate=-1,colName=-1,colAmt=-1,colCat=-1;
+
+  for(var i=0;i<Math.min(rows.length,15);i++){
+    var row=rows[i];
+    for(var j=0;j<row.length;j++){
+      var v=String(row[j]||'');
+      // Hebrew header detection
+      if(v.indexOf('תאריך')>=0)colDate=j;
+      if(v.indexOf('שם בית עסק')>=0||v.indexOf('תיאור')>=0||v.indexOf('פרטי')>=0)colName=j;
+      if(v.indexOf('סכום חיוב')>=0||v.indexOf('סכום\nחיוב')>=0)colAmt=j;
+      if(v.indexOf('ענף')>=0||v.indexOf('קטגוריה')>=0)colCat=j;
+      // English header detection
+      if(/date/i.test(v))colDate=j;
+      if(/merchant|description|name/i.test(v))colName=j;
+      if(/amount|charge/i.test(v)&&colAmt<0)colAmt=j;
+      if(/category|type/i.test(v))colCat=j;
+    }
+    if(colDate>=0&&colName>=0&&colAmt>=0){dataStart=i+1;break;}
+  }
+
+  // Fallback: auto-detect by scanning for first row where col0 looks like a date
+  if(dataStart<0){
+    for(var i=0;i<rows.length;i++){
+      var v=rows[i][0];
+      if(!v)continue;
+      var d=parseBankDate(v);
+      if(d&&d.getFullYear()>2000&&d.getFullYear()<2100){
+        dataStart=i;
+        colDate=0;colName=1;colAmt=3;colCat=5;
+        break;
+      }
+    }
+  }
+
+  if(dataStart<0){showBankError('Could not find transaction rows. Please check the file format.');return;}
+
+  var items=[];
+  for(var i=dataStart;i<rows.length;i++){
+    var row=rows[i];
+    if(!row||!row[colDate])continue;
+    var d=parseBankDate(row[colDate]);
+    if(!d||isNaN(d.getTime()))continue;
+    if(d<tripStart||d>tripEnd)continue;
+    var name=String(row[colName]||'').trim();
+    if(!name)continue;
+    var rawAmt=String(row[colAmt]||'0').replace(/[,\s₪$€]/g,'');
+    var amt=parseFloat(rawAmt);
+    if(!amt||isNaN(amt)||amt<=0)continue;
+    var hebrewCat=colCat>=0?String(row[colCat]||'').trim():'';
+    items.push({date:toDateStr2(d),name:name,amt:amt,hebrewCat:hebrewCat});
+  }
+
+  if(items.length===0){
+    showBankError('No transactions found between '+fdate(t.start)+' and '+fdate(t.end)+'. Make sure the statement covers the trip dates.');
+    return;
+  }
+
+  // Auto-map categories
+  var confirmed=[];
+  var needsReview=[];
+  items.forEach(function(item){
+    var mapped=BANK_CAT_MAP[item.hebrewCat];
+    if(mapped){
+      confirmed.push({date:item.date,desc:item.name,amt:item.amt,cat:mapped,hebrewCat:item.hebrewCat});
+    } else {
+      needsReview.push({date:item.date,desc:item.name,amt:item.amt,cat:'other',hebrewCat:item.hebrewCat});
+    }
+  });
+
+  _bankConfirmed=confirmed;
+  _bankPending=needsReview;
+
+  if(needsReview.length>0){
+    showBankReview();
+  } else {
+    showBankPreview();
+  }
+}
+
+function showBankError(msg){
+  document.getElementById('BANK_BODY').innerHTML='<div style="background:#ff444420;border:1px solid #ff4444;border-radius:10px;padding:14px;color:#ff6666;font-size:13px">⚠️ '+msg+'</div>';
+  document.getElementById('BANK_FOOTER').innerHTML='<button onclick="closeBankModal()" style="background:var(--surf2);border:1px solid var(--border);border-radius:10px;padding:10px 20px;color:var(--text);cursor:pointer">Close</button>';
+}
+
+var _reviewIdx=0;
+var DAY_CATS_LIST=[
+  {k:'food',l:'Food & Drinks',i:'🍽️'},
+  {k:'supermarket',l:'Supermarket',i:'🛒'},
+  {k:'transport',l:'Transport/Taxi',i:'🚌'},
+  {k:'gas',l:'Gas/Fuel',i:'⛽'},
+  {k:'hotel',l:'Accommodation',i:'🏨'},
+  {k:'activities',l:'Activities',i:'🎭'},
+  {k:'shopping',l:'Shopping',i:'🛍️'},
+  {k:'other',l:'Other',i:'📦'}
+];
+
+function showBankReview(){
+  _reviewIdx=0;
+  renderReviewItem();
+}
+
+function renderReviewItem(){
+  var item=_bankPending[_reviewIdx];
+  var total=_bankPending.length;
+  var body='<div style="margin-bottom:12px">';
+  body+='<div style="font-size:12px;color:var(--muted);margin-bottom:6px">Item '+(1+_reviewIdx)+' of '+total+' needs categorization:</div>';
+  body+='<div style="background:var(--surf2);border-radius:12px;padding:12px;margin-bottom:14px">';
+  body+='<div style="font-weight:700;font-size:15px;margin-bottom:4px">'+item.desc+'</div>';
+  body+='<div style="font-size:13px;color:var(--muted)">'+fdate(item.date)+(item.hebrewCat?' · '+item.hebrewCat:'')+'</div>';
+  body+='<div style="font-size:18px;font-weight:800;color:var(--orange);margin-top:6px">'+item.amt.toFixed(2)+' ILS</div>';
+  body+='</div>';
+  body+='<div style="font-size:13px;font-weight:600;margin-bottom:10px">Which category?</div>';
+  body+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">';
+  DAY_CATS_LIST.forEach(function(c){
+    var sel=item.cat===c.k?'border:2px solid var(--orange);background:var(--orange)20':'border:1px solid var(--border);background:var(--surf2)';
+    body+='<button data-action="review-cat" data-cat="'+c.k+'" style="'+sel+';border-radius:10px;padding:10px 8px;color:var(--text);cursor:pointer;text-align:left;font-size:13px">'+c.i+' '+c.l+'</button>';
+  });
+  body+='</div>';
+  // Skip option
+  body+='<div style="margin-top:10px"><button data-action="review-skip" style="background:none;border:none;color:var(--muted);font-size:12px;cursor:pointer;text-decoration:underline">Skip this item</button></div>';
+  body+='</div>';
+  document.getElementById('BANK_BODY').innerHTML=body;
+
+  var footerBtns='<button onclick="closeBankModal()" style="background:var(--surf2);border:1px solid var(--border);border-radius:10px;padding:10px 20px;color:var(--text);cursor:pointer">Cancel</button>';
+  if(_reviewIdx>0)footerBtns+='<button data-action="review-back" style="background:var(--surf2);border:1px solid var(--border);border-radius:10px;padding:10px 20px;color:var(--text);cursor:pointer">← Back</button>';
+  document.getElementById('BANK_FOOTER').innerHTML=footerBtns;
+}
+
+function showBankPreview(){
+  var all=_bankConfirmed.slice();
+  // Group by date
+  var byDate={};
+  all.forEach(function(item){
+    if(!byDate[item.date])byDate[item.date]=[];
+    byDate[item.date].push(item);
+  });
+  var dates=Object.keys(byDate).sort();
+  var t=getTrip(_bankTripId);
+  var days=getDays(t);
+
+  var body='<div style="font-size:13px;color:var(--muted);margin-bottom:12px">Ready to import <strong style="color:var(--text)">'+all.length+' expenses</strong> into day-by-day:</div>';
+  body+='<div style="max-height:320px;overflow-y:auto;display:flex;flex-direction:column;gap:8px">';
+  dates.forEach(function(d){
+    var dayIdx=days.indexOf(d);
+    var dayLabel=dayIdx>=0?'Day '+(dayIdx+1)+' · '+fdate(d):fdate(d)+' (outside trip range)';
+    body+='<div style="background:var(--surf2);border-radius:10px;padding:10px 12px">';
+    body+='<div style="font-size:11px;font-weight:700;color:var(--orange);margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px">'+dayLabel+'</div>';
+    byDate[d].forEach(function(item){
+      var catDef=DAY_CATS_LIST.filter(function(c){return c.k===item.cat;})[0]||{i:'📦',l:'Other'};
+      body+='<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid var(--border)">';
+      body+='<div><span style="font-size:12px">'+catDef.i+'</span> <span style="font-size:13px">'+item.desc+'</span><div style="font-size:11px;color:var(--muted)">'+catDef.l+'</div></div>';
+      body+='<div style="font-weight:700;font-size:13px;white-space:nowrap">'+item.amt.toFixed(2)+' ILS</div>';
+      body+='</div>';
+    });
+    body+='</div>';
+  });
+  body+='</div>';
+  document.getElementById('BANK_BODY').innerHTML=body;
+  document.getElementById('BANK_FOOTER').innerHTML=
+    '<button onclick="closeBankModal()" style="background:var(--surf2);border:1px solid var(--border);border-radius:10px;padding:10px 20px;color:var(--text);cursor:pointer">Cancel</button>'+
+    '<button data-action="bank-confirm" style="background:var(--orange);color:#fff;border:none;border-radius:10px;padding:10px 24px;font-weight:700;cursor:pointer">Import '+all.length+' Expenses</button>';
+}
+
+function doBankImport(){
+  var t=getTrip(_bankTripId);
+  if(!t)return;
+  var days=getDays(t);
+  var added=0;
+  _bankConfirmed.forEach(function(item){
+    var dayIdx=days.indexOf(item.date);
+    if(dayIdx<0)return; // skip out-of-range
+    if(!t.day)t.day={};
+    if(!t.day[item.date])t.day[item.date]=[];
+    t.day[item.date].push({cat:item.cat,desc:item.desc,amt:item.amt,cur:'ILS'});
+    added++;
+  });
+  save();
+  closeBankModal();
+  goDetail(_bankTripId);
+  toast('✅ Imported '+added+' expenses!');
+}
+
+document.getElementById('F_BANK_FILE').addEventListener('change',function(){
+  if(this.files&&this.files[0]){
+    // Show loading state
+    document.getElementById('BANK_BODY').innerHTML='<div style="text-align:center;padding:24px 0;color:var(--muted)">⏳ Parsing file…</div>';
+    handleBankFile(this.files[0]);
+    this.value='';
+  }
+});
 
 // Single event handler for everything
 document.addEventListener('click',function(e){
@@ -1471,6 +1801,36 @@ document.addEventListener('click',function(e){
     if(a==='del'){if(confirm('Delete this trip? This cannot be undone.')){trips=trips.filter(function(t){return t.id!==el.dataset.id;});save();renderHome();toast('Deleted');}return;}
     if(a==='go-home'){goHome();return;}
     if(a==='export'){exportCSV(curTripId);return;}
+    if(a==='bank-upload'){openBankUpload(curTripId);return;}
+    if(a==='bank-confirm'){doBankImport();return;}
+    if(a==='review-cat'){
+      _bankPending[_reviewIdx].cat=el.dataset.cat;
+      // Move this item to confirmed and advance
+      _bankConfirmed.push(_bankPending[_reviewIdx]);
+      _bankPending.splice(_reviewIdx,1);
+      if(_bankPending.length===0){
+        showBankPreview();
+      } else {
+        if(_reviewIdx>=_bankPending.length)_reviewIdx=_bankPending.length-1;
+        renderReviewItem();
+      }
+      return;
+    }
+    if(a==='review-skip'){
+      // Skip (don't import this item) and advance
+      _bankPending.splice(_reviewIdx,1);
+      if(_bankPending.length===0){
+        showBankPreview();
+      } else {
+        if(_reviewIdx>=_bankPending.length)_reviewIdx=_bankPending.length-1;
+        renderReviewItem();
+      }
+      return;
+    }
+    if(a==='review-back'){
+      if(_reviewIdx>0){_reviewIdx--;renderReviewItem();}
+      return;
+    }
     if(a==='refresh-flight'){
       // Stop propagation so the expand/collapse doesn't fire
       e.stopPropagation();
