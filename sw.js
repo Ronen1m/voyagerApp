@@ -1,4 +1,4 @@
-var CACHE = 'voyager-v4';
+var CACHE = 'voyager-v5';
 var FILES = [
   '/voyagerApp/',
   '/voyagerApp/index.html'
