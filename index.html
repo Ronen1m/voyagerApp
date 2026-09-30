@@ -50,6 +50,8 @@ body{background:var(--bg);color:var(--text);font-family:var(--fb);min-height:100
 .row3{display:flex;gap:8px}
 .row3 .tbtn{flex:1;text-align:center;padding:10px 4px;font-size:12px}
 .fab{position:fixed;bottom:88px;right:18px;z-index:100;width:56px;height:56px;border-radius:16px;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;font-size:30px;line-height:56px;text-align:center;box-shadow:0 6px 20px rgba(240,165,0,0.4);cursor:pointer;user-select:none;border:none}
+.cat-chip{background:var(--surf2);border:2px solid var(--border);border-radius:10px;padding:8px 10px;font-size:13px;cursor:pointer;user-select:none;display:flex;align-items:center;gap:5px;transition:border-color .15s,background .15s}
+.cat-chip.sel{border-color:var(--accent);background:rgba(240,165,0,0.12);color:var(--accent)}
 .overlay{display:none;position:fixed;inset:0;z-index:200;background:rgba(0,0,0,0.65);backdrop-filter:blur(3px);align-items:flex-end}
 .overlay.on{display:flex}
 .sheet{background:var(--surf);border-radius:22px 22px 0 0;width:100%;max-height:90vh;overflow-y:auto;padding:20px 18px 44px;animation:up .22s ease}
@@ -210,7 +212,7 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(.5)}
   <div id="detail-wrap"></div>
 </div>
 
-<button class="fab" id="B_FAB">+</button>
+<button class="fab" id="B_FAB" style="display:none">+</button>
 
 <div class="overlay" id="OVL_TRIP">
   <div class="sheet">
@@ -332,6 +334,29 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(.5)}
   </div>
 </div>
 
+<div class="overlay" id="OVL_QUICK">
+  <div class="sheet">
+    <div class="handle"></div>
+    <h2 id="QA_TITLE">Quick Add</h2>
+    <div id="QA_DAY_LABEL" style="font-size:12px;color:var(--muted);margin:-12px 0 14px;text-transform:uppercase;letter-spacing:.6px"></div>
+    <div class="crow">
+      <div class="field"><label>Currency</label>
+        <select id="F_QACUR"></select>
+      </div>
+      <div class="field"><label>Amount</label><input id="F_QAAMT" type="number" placeholder="0.00" min="0" step="0.01" inputmode="decimal"></div>
+    </div>
+    <div class="field"><label>Description (optional)</label><input id="F_QADESC" type="text" placeholder="e.g. Lunch at restaurant"></div>
+    <div class="field">
+      <label>Category</label>
+      <div id="QA_CATS" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:4px"></div>
+    </div>
+    <div class="btn2">
+      <button class="cancel" id="B_QA_CANCEL">Cancel</button>
+      <button class="ok" id="B_QA_SAVE">➕ Add</button>
+    </div>
+  </div>
+</div>
+
 <div class="overlay" id="OVL_NOTES">
   <div class="sheet">
     <div class="handle"></div>
@@ -431,9 +456,18 @@ function save(){
     // Save images separately per trip
     trips.forEach(function(t){
       if(t.iconImage){
-        try{sSet('voy3_img_'+t.id,t.iconImage);}catch(e){}
+        try{
+          localStorage.setItem('voy3_img_'+t.id,t.iconImage);
+        }catch(e){
+          // Quota exceeded — try removing other images to make room, then retry
+          try{
+            var keys=[];for(var k in localStorage){if(k.indexOf('voy3_img_')===0&&k!=='voy3_img_'+t.id)keys.push(k);}
+            if(keys.length){localStorage.removeItem(keys[0]);localStorage.setItem('voy3_img_'+t.id,t.iconImage);}
+          }catch(e2){_mem['voy3_img_'+t.id]=t.iconImage;}
+        }
       } else {
         try{localStorage.removeItem('voy3_img_'+t.id);}catch(e){}
+        delete _mem['voy3_img_'+t.id];
       }
     });
   } catch(e) {
@@ -446,10 +480,12 @@ function getTrip(id){for(var i=0;i<trips.length;i++){if(trips[i].id===id)return 
 function sym(c){return SYMS[c]||c;}
 function fmt(a,c){return sym(c)+parseFloat(a).toFixed(2);}
 function secAmt(a,pc){
-  if(!settings.sec||settings.sec===pc)return'';
-  var r=parseFloat(settings.rates[pc]||0);
-  if(!r)return'';
-  return '&#8776;'+sym(settings.sec)+(parseFloat(a)*r).toFixed(2);
+  var sec=settings.sec;
+  if(!sec||sec===pc)return'';
+  var converted=convertToTrip(parseFloat(a||0),pc,sec);
+  // If conversion returned the raw value (no rate), don't show
+  if(converted===parseFloat(a||0)&&pc!==sec)return'';
+  return '&#8776;'+sym(sec)+converted.toFixed(2);
 }
 
 // Convert amount to primary currency for display
@@ -477,25 +513,23 @@ function convertToTrip(amt,fromCur,tripCur){
   amt=parseFloat(amt||0);
   if(!fromCur||fromCur===tripCur)return amt;
   var rates=settings.rates||{};
-  var sec=settings.sec||'';
-  // rates[X] = how many ILS (secondary) per 1 X
-  // Convert fromCur -> tripCur via secondary as bridge
-  // Case 1: tripCur is the secondary currency
-  if(sec===tripCur){
-    var r=parseFloat(rates[fromCur]||0);
-    if(r)return amt*r;
+  var prim=settings.prim||'ILS';
+  // rates[X] = how many PRIMARY (prim) currency units per 1 unit of X
+  // e.g. rates['USD']=3.65 means 1 USD = 3.65 ILS (when prim=ILS)
+  // Step 1: convert fromCur → prim
+  function toPrimary(a,cur){
+    if(cur===prim)return a;
+    var r=parseFloat(rates[cur]||0);
+    return r?a*r:a; // fallback: no rate, use raw
   }
-  // Case 2: fromCur is the secondary currency
-  if(sec===fromCur){
-    var r2=parseFloat(rates[tripCur]||0);
-    if(r2)return amt/r2;
+  // Step 2: convert prim → tripCur
+  function fromPrimary(a,cur){
+    if(cur===prim)return a;
+    var r=parseFloat(rates[cur]||0);
+    return r?a/r:a; // fallback: no rate, use raw
   }
-  // Case 3: both fromCur and tripCur have rates to secondary — convert via bridge
-  var rFrom=parseFloat(rates[fromCur]||0);
-  var rTrip=parseFloat(rates[tripCur]||0);
-  if(rFrom&&rTrip)return amt*(rFrom/rTrip);
-  // Fallback: no rate available, return raw
-  return amt;
+  var inPrim=toPrimary(amt,fromCur);
+  return fromPrimary(inPrim,tripCur);
 }
 function tGen(t){var cur=t.cur||'USD';return(t.gen||[]).reduce(function(s,e){return s+convertToTrip(e.amt,e.cur||cur,cur);},0);}
 function tDay(t){var cur=t.cur||'USD';var s=0;var dv=t.day||{};Object.keys(dv).forEach(function(k){dv[k].forEach(function(e){s+=convertToTrip(e.amt,e.cur||cur,cur);});});return s;}
@@ -520,8 +554,7 @@ function renderHome(){
     var tot=tAll(t),gen=tGen(t),day=tDay(t),pd=nd>0?tot/nd:0;
     var prim=settings.prim||'ILS';
     var totP=toPrim(tot,cur),genP=toPrim(gen,cur),dayP=toPrim(day,cur),pdP=nd>0?toPrim(pd,cur):0;
-    var showPrim=(prim!==cur);
-    var s1=secAmt(tot,cur),s2=secAmt(gen,cur),s3=secAmt(day,cur),s4=nd>0?secAmt(pd,cur):'';
+    var hasSec=(prim!==cur);
     var bg=t.color||DEF_COLOR;
     html+='<div class="trip-card" data-id="'+t.id+'">';
     html+='<div class="trip-head" data-action="toggle" data-id="'+t.id+'">';
@@ -531,20 +564,15 @@ function renderHome(){
     html+='<div class="trip-info"><div class="trip-name">'+t.name+'</div>';
     html+='<div class="trip-sub">'+(t.start?fdate(t.start)+' to '+fdate(t.end):'No dates')+' · '+nd+' days</div></div>';
     html+='<div class="trip-amt">';
-    if(showPrim){
-      html+='<div class="big">'+fmt(totP,prim)+'</div>';
-      html+='<div class="small">'+fmt(tot,cur)+'</div>';
-    } else {
-      html+='<div class="big">'+fmt(tot,cur)+'</div>';
-      if(s1)html+='<div class="small">'+s1+'</div>';
-    }
+    html+='<div class="big">'+fmt(totP,prim)+'</div>';
+    if(hasSec)html+='<div class="small">'+fmt(tot,cur)+'</div>';
     html+='<div class="small">total</div></div>';
     html+='<div class="chev">›</div></div>';
     html+='<div class="trip-body">'+(t.desc?'<div class="trip-desc-text">📝 '+t.desc+'</div>':'');
     html+='<div class="stats3">';
-    html+='<div class="stat"><div class="v">'+(showPrim?fmt(genP,prim):fmt(gen,cur))+'</div>'+(showPrim?'<div class="s">'+fmt(gen,cur)+'</div>':(s2?'<div class="s">'+s2+'</div>':''))+'<div class="l">General</div></div>';
-    html+='<div class="stat"><div class="v">'+(showPrim?fmt(dayP,prim):fmt(day,cur))+'</div>'+(showPrim?'<div class="s">'+fmt(day,cur)+'</div>':(s3?'<div class="s">'+s3+'</div>':''))+'<div class="l">Daily</div></div>';
-    html+='<div class="stat"><div class="v">'+(nd>0?(showPrim?fmt(pdP,prim):fmt(pd,cur)):'—')+'</div>'+(nd>0&&showPrim?'<div class="s">'+fmt(pd,cur)+'</div>':(s4?'<div class="s">'+s4+'</div>':''))+'<div class="l">Per Day</div></div>';
+    html+='<div class="stat"><div class="v">'+fmt(genP,prim)+'</div>'+(hasSec?'<div class="s">'+fmt(gen,cur)+'</div>':'')+'<div class="l">General</div></div>';
+    html+='<div class="stat"><div class="v">'+fmt(dayP,prim)+'</div>'+(hasSec?'<div class="s">'+fmt(day,cur)+'</div>':'')+'<div class="l">Daily</div></div>';
+    html+='<div class="stat"><div class="v">'+(nd>0?fmt(pdP,prim):'—')+'</div>'+(nd>0&&hasSec?'<div class="s">'+fmt(pd,cur)+'</div>':'')+'<div class="l">Per Day</div></div>';
     html+='</div>';
     html+='<div class="row3">';
     html+='<button class="tbtn primary" data-action="detail" data-id="'+t.id+'">📋 Details</button>';
@@ -932,7 +960,7 @@ function renderDetail(){
   html+='<div style="display:flex;align-items:center;gap:10px">';
   html+='<div style="width:44px;height:44px;border-radius:13px;background:'+bg+';display:flex;align-items:center;justify-content:center;font-size:26px;flex-shrink:0">'+t.emoji+'</div>';
   html+='<div><div style="font-family:var(--fh);font-size:19px;font-weight:800">'+t.name+'</div>';
-  html+='<div style="font-size:11px;color:var(--muted);margin-top:3px">'+(t.start?fdate(t.start)+' to '+fdate(t.end):'No dates')+' · '+dd.length+' days'+(settings.sec?' · <span style="color:var(--green)">+'+settings.sec+'</span>':'')+'</div>';
+  html+='<div style="font-size:11px;color:var(--muted);margin-top:3px">'+(t.start?fdate(t.start)+' to '+fdate(t.end):'No dates')+' · '+dd.length+' days</div>';
   if(t.desc)html+='<div style="font-size:12px;color:var(--muted);font-style:italic;margin-top:4px;line-height:1.4">'+t.desc+'</div>';
   html+='</div></div>';
   html+='<div style="display:flex;gap:8px;flex-shrink:0">';
@@ -961,13 +989,13 @@ function renderDetail(){
 
 function goHome(){
   curTripId=null;
-  document.getElementById('B_FAB').style.display='';
+  document.getElementById('B_FAB').style.display='none';
   showScreen('SCR_HOME');
   renderHome();
 }
 function goDetail(id){
   curTripId=id;
-  document.getElementById('B_FAB').style.display='none';
+  document.getElementById('B_FAB').style.display='';
   renderDetail();
   showScreen('SCR_DETAIL');
 }
@@ -1252,6 +1280,64 @@ function saveExp(){
   save();closeOvl('OVL_EXP');renderDetail();
 }
 function delExp(date,i){if(!confirm('Delete this expense?'))return;var t=getTrip(curTripId);t.day[date].splice(i,1);save();renderDetail();toast('Deleted');}
+
+var _qaSelectedCat='food';
+function openQuickAdd(){
+  var t=getTrip(curTripId);
+  if(!t)return;
+  // Find today's date in the trip days
+  var today=new Date();
+  var todayStr=today.toISOString().slice(0,10);
+  var days=getDays(t);
+  // Find matching day or fall back to first day
+  var targetDate=todayStr;
+  if(days.length&&days.indexOf(todayStr)<0){
+    // Pick closest day
+    targetDate=days[0];
+    var minDiff=Infinity;
+    days.forEach(function(d){
+      var diff=Math.abs(new Date(d+' 00:00:00')-today);
+      if(diff<minDiff){minDiff=diff;targetDate=d;}
+    });
+  }
+  curDay=targetDate;
+  var dayIdx=days.indexOf(targetDate);
+  var dn=new Date(targetDate+'T00:00:00');
+  var dayLabel='Today · '+dn.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
+  if(dayIdx>=0)dayLabel='Day '+(dayIdx+1)+' · '+dn.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
+  document.getElementById('QA_TITLE').textContent='Quick Add';
+  document.getElementById('QA_DAY_LABEL').textContent=dayLabel;
+  document.getElementById('F_QAAMT').value='';
+  document.getElementById('F_QADESC').value='';
+  fillCurSelect('F_QACUR',t.cur||'USD');
+  // Render category chips
+  _qaSelectedCat='food';
+  var chips='';
+  DAY_CATS_LIST.forEach(function(c){
+    chips+='<div class="cat-chip'+(c.k==='food'?' sel':'')+'">'+c.i+' '+c.l+'</div>';
+  });
+  document.getElementById('QA_CATS').innerHTML=chips;
+  openOvl('OVL_QUICK');
+  setTimeout(function(){document.getElementById('F_QAAMT').focus();},300);
+}
+function saveQuickAdd(){
+  var amt=parseFloat(document.getElementById('F_QAAMT').value);
+  if(!amt||amt<=0){toast('Enter a valid amount');return;}
+  var desc=document.getElementById('F_QADESC').value.trim();
+  var cur=document.getElementById('F_QACUR').value;
+  var selChip=document.querySelector('#QA_CATS .cat-chip.sel');
+  var cat='food';
+  if(selChip){
+    var chipText=selChip.textContent||'';
+    DAY_CATS_LIST.forEach(function(c){if(chipText.indexOf(c.l)>=0)cat=c.k;});
+  }
+  var t=getTrip(curTripId);
+  if(!t.day)t.day={};
+  if(!t.day[curDay])t.day[curDay]=[];
+  t.day[curDay].push({cat:cat,desc:desc,amt:amt,cur:cur});
+  save();closeOvl('OVL_QUICK');renderDetail();
+  toast('✅ Added to Day!');
+}
 
 function openNoteForm(date,idx){
   curDay=date;
@@ -1674,15 +1760,37 @@ function showBankPreview(){
     '<button data-action="bank-confirm" style="background:var(--orange);color:#fff;border:none;border-radius:10px;padding:10px 24px;font-weight:700;cursor:pointer">Import '+all.length+' Expenses</button>';
 }
 
+function fuzzyMatch(a,b){
+  if(!a||!b)return false;
+  a=(a+'').toLowerCase().replace(/[^a-z0-9֐-׿]/g,'');
+  b=(b+'').toLowerCase().replace(/[^a-z0-9֐-׿]/g,'');
+  if(!a||!b)return false;
+  if(a===b)return true;
+  var short=a.length<b.length?a:b;
+  var long=a.length<b.length?b:a;
+  if(long.indexOf(short)>=0)return true;
+  var n=Math.min(6,short.length);
+  return a.slice(0,n)===b.slice(0,n);
+}
 function doBankImport(){
   var t=getTrip(_bankTripId);
   if(!t)return;
   var days=getDays(t);
-  var added=0;
+  var added=0,skipped=0;
   _bankConfirmed.forEach(function(item){
     var dayIdx=days.indexOf(item.date);
     if(dayIdx<0)return; // skip out-of-range
     if(!t.day)t.day={};
+    // Duplicate check: same date, amount within 0.5, fuzzy merchant name match
+    var existing=t.day[item.date]||[];
+    var isDup=false;
+    for(var i=0;i<existing.length;i++){
+      var ex=existing[i];
+      var amtMatch=Math.abs(parseFloat(ex.amt||0)-parseFloat(item.amt||0))<0.5;
+      var descMatch=fuzzyMatch(ex.desc,item.desc);
+      if(amtMatch&&descMatch){isDup=true;break;}
+    }
+    if(isDup){skipped++;return;}
     if(!t.day[item.date])t.day[item.date]=[];
     t.day[item.date].push({cat:item.cat,desc:item.desc,amt:item.amt,cur:'ILS'});
     added++;
@@ -1690,7 +1798,9 @@ function doBankImport(){
   save();
   closeBankModal();
   goDetail(_bankTripId);
-  toast('✅ Imported '+added+' expenses!');
+  var msg='✅ Imported '+added+' expense'+(added!==1?'s':'')+'!';
+  if(skipped>0)msg+=' ('+skipped+' duplicate'+(skipped!==1?'s':'')+' skipped)';
+  toast(msg);
 }
 
 document.getElementById('F_BANK_FILE').addEventListener('change',function(){
@@ -1712,7 +1822,8 @@ document.addEventListener('click',function(e){
     var eid=el.id||'';
 
     // Static button IDs
-    if(eid==='B_NEW_TRIP'||eid==='B_FAB'){openTripForm();return;}
+    if(eid==='B_NEW_TRIP'){openTripForm();return;}
+    if(eid==='B_FAB'){if(curTripId)openQuickAdd();else openTripForm();return;}
     if(eid==='B_BACKUP'){backupTrips();return;}
     if(eid==='B_IMPORT_BTN'){importTrips();return;}
     if(eid==='B_SETTINGS'){openSettings();return;}
@@ -1787,8 +1898,17 @@ document.addEventListener('click',function(e){
     if(eid==='B_GEN_SAVE'){saveGen();return;}
     if(eid==='B_EXP_CANCEL'){closeOvl('OVL_EXP');return;}
     if(eid==='B_EXP_SAVE'){saveExp();return;}
+    if(eid==='B_QA_CANCEL'){closeOvl('OVL_QUICK');return;}
+    if(eid==='B_QA_SAVE'){saveQuickAdd();return;}
     if(eid==='B_NOTES_CANCEL'){closeOvl('OVL_NOTES');return;}
     if(eid==='B_NOTES_SAVE'){saveNotes();return;}
+
+    // Quick-add category chip selection
+    if(el.classList&&el.classList.contains('cat-chip')&&el.closest('#QA_CATS')){
+      document.querySelectorAll('#QA_CATS .cat-chip').forEach(function(c){c.classList.remove('sel');});
+      el.classList.add('sel');
+      return;
+    }
 
     // Data-action attributes
     if(a==='toggle'){
@@ -1901,8 +2021,18 @@ document.getElementById('F_ICON_IMAGE').addEventListener('change',function(){
   if(!file)return;
   var reader=new FileReader();
   reader.onload=function(ev){
-    pickImage=ev.target.result;
-    updatePreview();
+    // Resize to max 200x200 to stay within localStorage quota
+    var img=new Image();
+    img.onload=function(){
+      var MAX=200;
+      var w=img.width,h=img.height;
+      if(w>MAX||h>MAX){var sc=Math.min(MAX/w,MAX/h);w=Math.round(w*sc);h=Math.round(h*sc);}
+      var c=document.createElement('canvas');c.width=w;c.height=h;
+      c.getContext('2d').drawImage(img,0,0,w,h);
+      pickImage=c.toDataURL('image/jpeg',0.8);
+      updatePreview();
+    };
+    img.src=ev.target.result;
   };
   reader.readAsDataURL(file);
   this.value='';
