@@ -21,10 +21,13 @@
   --fh:'Syne',sans-serif;--fb:'DM Sans',sans-serif;
 }
 body{background:var(--bg);color:var(--text);font-family:var(--fb);min-height:100vh;overflow-x:hidden;-webkit-overflow-scrolling:touch}
-.topbar{position:sticky;top:0;z-index:50;background:var(--bg);padding:10px 12px 8px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border)}
-.logo{font-family:var(--fh);font-size:18px;font-weight:800;background:linear-gradient(135deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
-.topbar-btns{display:flex;gap:5px;align-items:center}
-.tbtn{background:var(--surf2);border:1px solid var(--border);border-radius:10px;padding:6px 10px;color:var(--text);font-family:var(--fb);font-size:12px;font-weight:500;cursor:pointer;user-select:none;display:inline-block}
+.topbar{position:sticky;top:0;z-index:50;background:var(--bg);padding:14px 16px 0;border-bottom:1px solid var(--border)}
+.topbar-row1{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.logo{font-family:var(--fh);font-size:26px;font-weight:800;background:linear-gradient(135deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;letter-spacing:-0.5px}
+.logo-icon{font-size:22px;filter:drop-shadow(0 0 6px rgba(240,165,0,0.5))}
+.topbar-btns{display:flex;gap:6px;padding-bottom:12px}
+.tbtn{background:var(--surf2);border:1px solid var(--border);border-radius:10px;padding:9px 6px;color:var(--text);font-family:var(--fb);font-size:11px;font-weight:500;cursor:pointer;user-select:none;display:flex;flex-direction:column;align-items:center;gap:3px;flex:1;white-space:nowrap}
+.tbtn .ticon{font-size:16px;line-height:1}
 .tbtn.primary{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;border-color:transparent}
 .tbtn.danger{background:rgba(240,82,82,0.12);color:var(--red);border-color:transparent}
 .screen{display:none;padding:12px 14px 120px}.screen.on{display:block}
@@ -182,13 +185,16 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(.5)}
   <button id="B_INSTALL_CLOSE" style="background:none;border:none;color:var(--muted);font-size:18px;cursor:pointer;padding:4px">×</button>
 </div>
 <div class="topbar">
-  <div class="logo">✈ Voyager</div>
+  <div class="topbar-row1">
+    <span class="logo-icon">✈️</span>
+    <div class="logo">Voyager</div>
+  </div>
   <div class="topbar-btns">
-    <button class="tbtn primary" id="B_NEW_TRIP">＋ New Trip</button>
-    <button class="tbtn" id="B_SORT">🔽 Newest</button>
-    <button class="tbtn" id="B_BACKUP">💾</button>
-    <button class="tbtn" id="B_IMPORT_BTN">📂</button>
-    <button class="tbtn" id="B_SETTINGS">⚙️</button>
+    <button class="tbtn primary" id="B_NEW_TRIP"><span class="ticon">＋</span>New Trip</button>
+    <button class="tbtn" id="B_SORT"><span class="ticon">🔽</span>Newest</button>
+    <button class="tbtn" id="B_BACKUP"><span class="ticon">💾</span>Backup</button>
+    <button class="tbtn" id="B_IMPORT_BTN"><span class="ticon">📂</span>Import</button>
+    <button class="tbtn" id="B_SETTINGS"><span class="ticon">⚙️</span>Settings</button>
   </div>
   <input type="file" id="F_IMPORT_FILE" accept="application/json,text/csv,.json,.csv,*/*" style="display:none">
   <input type="file" id="F_BANK_FILE" accept=".xlsx,.xls,.csv,*/*" style="display:none">
@@ -1887,7 +1893,7 @@ document.addEventListener('click',function(e){
       document.getElementById('RF_CUSTOM_RATE').value='';
       return;
     }
-    if(eid==='B_SORT'){sortAsc=!sortAsc;document.getElementById('B_SORT').textContent=sortAsc?'🔼 Oldest':'🔽 Newest';renderHome();return;}
+    if(eid==='B_SORT'){sortAsc=!sortAsc;document.getElementById('B_SORT').innerHTML=sortAsc?'<span class="ticon">🔼</span>Oldest':'<span class="ticon">🔽</span>Newest';renderHome();return;}
     if(eid==='B_TRIP_CANCEL'){closeOvl('OVL_TRIP');return;}
     if(eid==='B_UPLOAD_ICON'){document.getElementById('F_ICON_IMAGE').click();return;}
     if(eid==='B_CLEAR_ICON'){pickImage=null;document.getElementById('F_ICON_IMAGE').value='';updatePreview();return;}
