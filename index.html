@@ -594,6 +594,7 @@ function renderHome(){
 }
 
 // ══════════════════════ FLIGHT STATUS ══════════════════════
+var RAPIDAPI_KEY = ''; // AeroDataBox via RapidAPI: supports future dates
 var AIRLABS_KEY = 'b3bfd801-c49c-4e67-95bd-ee9e0c0147fd';
 var FLIGHT_CACHE_MS = 10*60*1000; // reuse a result for 10 minutes to save the free quota
 
@@ -661,12 +662,12 @@ function renderFlightBoxes() {
       var boxId = 'FB_' + ei + '_' + fi;
       var cached = flightCache[fn + '_' + (fd || '')];
       var dateStr = fd ? ' <span style="font-size:10px;color:var(--muted);font-weight:400">· ' + fdate(fd) + '</span>' : '';
-      var statusDot = cached ? (cached.status === 'cancelled' ? ' 🔴' : cached.status === 'delayed' ? ' 🟡' : cached.status === 'landed' ? ' ✅' : ' 🔵') : '';
+      var statusDot = cached ? flightDot(cached.status) : '';
 
       html += '<div class="flight-box" id="' + boxId + '">';
       // Collapsible header - click to expand
       html += '<div class="flight-box-head" data-action="toggle-flight" data-box="' + boxId + '">';
-      html += '<div class="flight-box-title">' + label + ' · <span style="color:#60a5fa">' + fn + '</span>' + statusDot + dateStr + '</div>';
+      html += '<div class="flight-box-title">' + label + ' · <span style="color:#60a5fa">' + fn + '</span><span class="fb-dot">' + statusDot + '</span>' + dateStr + '</div>';
       html += '<div style="display:flex;align-items:center;gap:8px">';
       html += '<button class="flight-refresh" data-action="refresh-flight" data-fn="' + fn + '" data-date="' + (fd||'') + '" data-box="' + boxId + '">↻</button>';
       html += '<span class="flight-box-chevron">›</span>';
@@ -686,8 +687,9 @@ function renderFlightBoxes() {
 }
 
 var flightCache = {};
+function flightDot(st){ return st==='cancelled' ? ' 🔴' : st==='delayed' ? ' 🟡' : st==='landed' ? ' ✅' : ' 🔵'; }
 
-function refreshFlight(fn, date, boxId) {
+function refreshFlightAirLabs(fn, date, boxId) {
   var box = document.getElementById(boxId);
   if (!box) return;
   var refreshBtn = box.querySelector('.flight-refresh');
@@ -750,6 +752,80 @@ function refreshFlight(fn, date, boxId) {
   });
 }
 
+function refreshFlight(fn, date, boxId) {
+  if (RAPIDAPI_KEY) refreshFlightADB(fn, date, boxId);
+  else refreshFlightAirLabs(fn, date, boxId);
+}
+
+// AeroDataBox: status for a specific date, including future flights
+function refreshFlightADB(fn, date, boxId) {
+  var box = document.getElementById(boxId);
+  if (!box) return;
+  var refreshBtn = box.querySelector('.flight-refresh');
+  var key = fn + '_' + (date || '');
+  var cached = flightCache[key];
+  if (cached && cached._at && (Date.now() - cached._at) < FLIGHT_CACHE_MS) { updateFlightBox(box, fn, cached); return; }
+  refreshBtn.textContent = '⟳';
+  refreshBtn.disabled = true;
+  var day = date || toDateStr(new Date());
+  var done = function(){ refreshBtn.textContent = '↻'; refreshBtn.disabled = false; };
+
+  fetch('https://aerodatabox.p.rapidapi.com/flights/number/' + encodeURIComponent(fn) + '/' + day + '?withAircraftImage=false&withLocation=false&dateLocalRole=Departure', {
+    headers: { 'x-rapidapi-key': RAPIDAPI_KEY, 'x-rapidapi-host': 'aerodatabox.p.rapidapi.com' }
+  })
+  .then(function(r){
+    if (r.status === 204 || r.status === 404) return [];
+    if (!r.ok) throw new Error('HTTP ' + r.status + (r.status === 429 ? ' – monthly limit reached' : ''));
+    return r.json();
+  })
+  .then(function(list){
+    if (!Array.isArray(list) || !list.length) throw new Error('NOTFOUND');
+    var f = list[0], d = f.departure || {}, a = f.arrival || {};
+    var tm = function(x, k){ // supports both old and new AeroDataBox formats
+      var o = x[k + 'Time'];
+      if (o && typeof o === 'object') return { local: o.local || '', utc: o.utc || '' };
+      return { local: x[k + 'TimeLocal'] || '', utc: x[k + 'TimeUtc'] || '' };
+    };
+    var hhmm = function(v){ return v ? String(v).slice(11,16) : ''; };
+    var mins = function(u){ var t = Date.parse(String(u).replace(' ', 'T')); return isNaN(t) ? null : t/60000; };
+    var delay = function(x){
+      var sch = tm(x,'scheduled'), rev = tm(x,'revised'), act = tm(x,'actual');
+      var best = act.utc || rev.utc; if (!best || !sch.utc) return 0;
+      var dm = Math.round(mins(best) - mins(sch.utc)); return dm > 0 ? dm : 0;
+    };
+    var shown = function(x){ var r = tm(x,'revised'), s2 = tm(x,'scheduled'); return hhmm(r.local || s2.local); };
+    var raw = String(f.status || '').toLowerCase();
+    var st = /cancel/.test(raw) ? 'cancelled' : /arrived/.test(raw) ? 'landed'
+           : /enroute|departed|approaching/.test(raw) ? 'active' : 'scheduled';
+    var dd = delay(d);
+    if (st === 'scheduled' && (dd > 0 || /delay/.test(raw))) st = 'delayed';
+    var ap = function(x){ return x.airport || {}; };
+    var flight = {
+      status: st,
+      airline: (f.airline && f.airline.name) || '',
+      dep_airport: ap(d).name || '', dep_iata: ap(d).iata || '', dep_country: ap(d).countryCode || '',
+      dep_time: shown(d), dep_terminal: d.terminal || null, dep_gate: d.gate || null,
+      dep_counters: d.checkInDesk || null, dep_delay: dd,
+      arr_airport: ap(a).name || '', arr_iata: ap(a).iata || '', arr_country: ap(a).countryCode || '',
+      arr_time: shown(a), arr_terminal: a.terminal || null, arr_gate: a.gate || null, arr_delay: delay(a),
+      note: (d.gate || d.terminal) ? '' : 'Gate and terminal usually appear closer to departure.',
+      _at: Date.now()
+    };
+    flightCache[key] = flight;
+    updateFlightBox(box, fn, flight);
+    done();
+  })
+  .catch(function(e){
+    console.log('Flight fetch error:', e);
+    done();
+    var body = box.querySelector('.flight-box-body');
+    if (body) body.innerHTML = (e && e.message === 'NOTFOUND')
+      ? '<div class="flight-error">No flight ' + fn + ' found on ' + fdate(day) + '. Check the flight number and date.</div>'
+      : '<div class="flight-error">Could not fetch flight data (' + (e && e.message || 'error') + '). Try again.</div>';
+    box.classList.add('open');
+  });
+}
+
 function updateFlightBox(box, fn, flight) {
   var body = box.querySelector('.flight-box-body');
   if (body) {
@@ -758,12 +834,8 @@ function updateFlightBox(box, fn, flight) {
   // Auto-open after refresh
   box.classList.add('open');
   // Update status dot in title
-  var titleEl = box.querySelector('.flight-box-title');
-  if (titleEl) {
-    var dot = flight.status === 'cancelled' ? ' 🔴' : flight.status === 'delayed' ? ' 🟡' : flight.status === 'landed' ? ' ✅' : ' 🔵';
-    // Remove old dot and add new
-    titleEl.innerHTML = titleEl.innerHTML.replace(/ (🔴|🟡|✅|🔵)/g, '') + dot;
-  }
+  var dotEl = box.querySelector('.fb-dot');
+  if (dotEl) dotEl.textContent = flightDot(flight.status);
 }
 
 function renderFlightDataSimple(f) {
