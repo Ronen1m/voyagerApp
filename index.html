@@ -315,7 +315,8 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(.5)}
         <option value="other">📦 Other</option>
       </select>
     </div>
-    <div class="field"><label>Description</label><input id="F_GDESC" type="text" placeholder="e.g. Flight TLV to JFK"></div>
+    <div class="field"><label>Description</label><input id="F_GDESC" type="text" placeholder="e.g. Flight TLV to JFK">
+      <div id="F_GDESC_HINT" style="display:none;margin-top:6px;font-size:11px;line-height:1.5;color:#60a5fa;background:rgba(59,130,246,0.08);border:1px solid rgba(59,130,246,0.2);border-radius:8px;padding:7px 9px">✈️ For live flight status, add the flight numbers: <b>outbound first, then return</b>. Example: <b>LY971 LY976</b></div></div>
     <div class="frow" id="F_DATES_ROW" style="display:none">
       <div class="field"><label>From Date</label><input id="F_GDATE_FROM" type="date"></div>
       <div class="field"><label>To Date</label><input id="F_GDATE_TO" type="date"></div>
@@ -416,6 +417,9 @@ function toggleGenDates(){
   var type=document.getElementById('F_GTYPE').value;
   var show=(type==='flight'||type==='hotel'||type==='car');
   document.getElementById('F_DATES_ROW').style.display=show?'grid':'none';
+  var isFlight=(type==='flight');
+  document.getElementById('F_GDESC_HINT').style.display=isFlight?'block':'none';
+  document.getElementById('F_GDESC').placeholder=isFlight?'e.g. TLV–DXB · LY971 LY976':'e.g. Hotel in Rome';
 }
 var SYMS={USD:'$',EUR:'€',GBP:'£',ILS:'₪',JPY:'¥',AUD:'A$',CAD:'C$',CHF:'CHF',MXN:'MX$',INR:'₹',AED:'AED',THB:'฿',SGD:'S$',TRY:'₺',PLN:'zł'};
 var CURRENCIES=[
