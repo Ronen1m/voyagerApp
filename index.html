@@ -6,6 +6,7 @@
 <title>Voyager Expenses v3</title>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@400;500&display=swap" rel="stylesheet">
 <link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
 <meta name="theme-color" content="#0f1923">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -17,7 +18,7 @@
   --bg:#0f1923;--surf:#1a2535;--surf2:#243044;
   --accent:#f0a500;--accent2:#e05c2a;
   --text:#eef2f7;--muted:#7a8fa6;--border:rgba(255,255,255,0.08);
-  --green:#2dd4a0;--red:#f05252;--r:14px;
+  --green:#2dd4a0;--orange:#f97316;--red:#f05252;--r:14px;
   --fh:'Syne',sans-serif;--fb:'DM Sans',sans-serif;
 }
 body{background:var(--bg);color:var(--text);font-family:var(--fb);min-height:100vh;overflow-x:hidden;-webkit-overflow-scrolling:touch}
@@ -36,10 +37,10 @@ body{background:var(--bg);color:var(--text);font-family:var(--fb);min-height:100
 .trip-icon{width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0}
 .trip-info{flex:1;min-width:0}
 .trip-name{font-family:var(--fh);font-weight:700;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.trip-sub{font-size:11px;color:var(--muted);margin-top:2px}
-.trip-amt{text-align:right;flex-shrink:0}
-.trip-amt .big{font-family:var(--fh);font-weight:700;font-size:17px;color:var(--accent)}
-.trip-amt .small{font-size:11px;color:var(--muted);margin-top:1px}
+.trip-sub{font-size:11px;color:var(--muted);margin-top:2px;line-height:1.5}
+.trip-amt{text-align:right;flex-shrink:0;min-width:0;max-width:110px}
+.trip-amt .big{font-family:var(--fh);font-weight:700;font-size:14px;color:var(--accent)}
+.trip-amt .small{font-size:10px;color:var(--muted);margin-top:1px}
 .chev{color:var(--muted);font-size:20px;margin-left:4px;transition:transform .2s;flex-shrink:0}
 .trip-card.open .chev{transform:rotate(90deg)}
 .trip-body{display:none;border-top:1px solid var(--border);padding:12px 14px 14px}
@@ -257,7 +258,10 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(.5)}
 <div class="overlay" id="OVL_SETTINGS">
   <div class="sheet">
     <div class="handle"></div>
-    <h2>Settings</h2>
+    <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:18px">
+      <h2 style="margin-bottom:0">Settings</h2>
+      <span style="font-size:11px;color:var(--muted);font-family:var(--fb)">v1.12</span>
+    </div>
     <div class="field"><label>Primary Currency (your home currency)</label>
       <select id="F_PRIMCUR"></select>
     </div>
@@ -568,7 +572,7 @@ function renderHome(){
     var iconContent=t.iconImage?'':t.emoji;
     html+='<div class="trip-icon" style="'+iconStyle+';">'+iconContent+'</div>';
     html+='<div class="trip-info"><div class="trip-name">'+t.name+'</div>';
-    html+='<div class="trip-sub">'+(t.start?fdate(t.start)+' to '+fdate(t.end):'No dates')+' · '+nd+' days</div></div>';
+    html+='<div class="trip-sub">'+(t.start?fdate(t.start)+' to '+fdate(t.end):'No dates')+'<br>'+nd+' day'+(nd!==1?'s':'')+'</div></div>';
     html+='<div class="trip-amt">';
     html+='<div class="big">'+fmt(totP,prim)+'</div>';
     if(hasSec)html+='<div class="small">'+fmt(tot,cur)+'</div>';
@@ -590,7 +594,8 @@ function renderHome(){
 }
 
 // ══════════════════════ FLIGHT STATUS ══════════════════════
-var RAPIDAPI_KEY = '6a114f8ae9msha12c81ad081be97p195c95jsn26979ea2918c';
+var AIRLABS_KEY = 'b3bfd801-c49c-4e67-95bd-ee9e0c0147fd';
+var FLIGHT_CACHE_MS = 10*60*1000; // reuse a result for 10 minutes to save the free quota
 
 function extractFlightNumbers(desc) {
   // Returns array of all flight numbers found in description
@@ -686,43 +691,55 @@ function refreshFlight(fn, date, boxId) {
   var box = document.getElementById(boxId);
   if (!box) return;
   var refreshBtn = box.querySelector('.flight-refresh');
+  var key = fn + '_' + (date || '');
+  var cached = flightCache[key];
+  if (cached && cached._at && (Date.now() - cached._at) < FLIGHT_CACHE_MS) {
+    updateFlightBox(box, fn, cached);
+    return;
+  }
   refreshBtn.textContent = '⟳ Loading...';
   refreshBtn.disabled = true;
 
-  // Claude API with web search - live accurate data (~5 sec)
-  var searchDate = date || toDateStr(new Date());
-  fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({
-      model: 'claude-sonnet-4-6',
-      max_tokens: 600,
-      tools: [{type: 'web_search_20250305', name: 'web_search'}],
-      messages: [{
-        role: 'user',
-        content: 'Search for live flight status of ' + fn + ' on ' + searchDate + '. Find: departure airport, arrival airport, scheduled time, terminal, gate, check-in counters, delay. Return ONLY this JSON (no other text): {"status":"scheduled/active/landed/cancelled/delayed","airline":"","dep_airport":"","dep_iata":"","dep_country":"","dep_time":"HH:MM","dep_terminal":null,"dep_gate":null,"dep_counters":null,"dep_delay":0,"arr_airport":"","arr_iata":"","arr_country":"","arr_time":"HH:MM","arr_terminal":null,"arr_gate":null,"arr_delay":0,"note":""}'
-      }]
-    })
-  })
-  .then(function(r){return r.json();})
+  // AirLabs flight info (free plan, ~1,000 lookups/month)
+  fetch('https://airlabs.co/api/v9/flight?flight_iata=' + encodeURIComponent(fn) + '&api_key=' + AIRLABS_KEY)
+  .then(function(r){ return r.json(); })
   .then(function(data){
-    var text='';
-    (data.content||[]).forEach(function(b){if(b.type==='text')text+=b.text;});
-    var m=text.match(/\{[\s\S]*\}/);
-    if(!m) throw new Error('No JSON');
-    var flight=JSON.parse(m[0]);
-    if(flight.dep_delay>0) flight.status='delayed';
-    flightCache[fn+'_'+(date||'')]=flight;
-    updateFlightBox(box,fn,flight);
-    refreshBtn.textContent='↻ Refresh';
-    refreshBtn.disabled=false;
+    if (data.error || !data.response) {
+      throw new Error((data.error && data.error.message) || 'Flight not found');
+    }
+    var f = data.response;
+    var hhmm = function(v){ return v ? String(v).slice(11,16) : ''; };
+    var st = (f.status || 'scheduled').toLowerCase();
+    if (st === 'en-route') st = 'active';
+    var depDelay = f.dep_delayed || f.delayed || 0;
+    if (depDelay > 0 && st === 'scheduled') st = 'delayed';
+    var depDate = f.dep_time ? String(f.dep_time).slice(0,10) : '';
+    var note = '';
+    if (date && depDate && depDate !== date) {
+      note = 'Live data is for the ' + fdate(depDate) + ' flight. Check again closer to your flight date.';
+    }
+    var flight = {
+      status: st,
+      airline: f.airline_name || f.airline_iata || '',
+      dep_airport: f.dep_name || '', dep_iata: f.dep_iata || '', dep_country: f.dep_country || '',
+      dep_time: hhmm(f.dep_estimated || f.dep_time), dep_terminal: f.dep_terminal || null,
+      dep_gate: f.dep_gate || null, dep_counters: null, dep_delay: depDelay,
+      arr_airport: f.arr_name || '', arr_iata: f.arr_iata || '', arr_country: f.arr_country || '',
+      arr_time: hhmm(f.arr_estimated || f.arr_time), arr_terminal: f.arr_terminal || null,
+      arr_gate: f.arr_gate || null, arr_delay: f.arr_delayed || 0,
+      note: note, _at: Date.now()
+    };
+    flightCache[key] = flight;
+    updateFlightBox(box, fn, flight);
+    refreshBtn.textContent = '↻ Refresh';
+    refreshBtn.disabled = false;
   })
   .catch(function(e){
-    console.log('Flight fetch error:',e);
-    refreshBtn.textContent='↻ Refresh';
-    refreshBtn.disabled=false;
-    var body=box.querySelector('.flight-box-body');
-    if(body) body.innerHTML='<div class="flight-error">Could not fetch flight data. Try again.</div>';
+    console.log('Flight fetch error:', e);
+    refreshBtn.textContent = '↻ Refresh';
+    refreshBtn.disabled = false;
+    var body = box.querySelector('.flight-box-body');
+    if (body) body.innerHTML = '<div class="flight-error">Could not fetch flight data' + (e && e.message ? ' (' + e.message + ')' : '') + '. Try again.</div>';
     box.classList.add('open');
   });
 }
@@ -797,6 +814,7 @@ function renderFlightDataSimple(f) {
     html += '<div class="fc-label">⚠️ Delay</div><div class="fc-val" style="color:var(--red)">'+f.dep_delay+' minutes</div></div>';
   }
   html += '</div>';
+  if (note) html += '<div style="font-size:11px;color:var(--muted);font-style:italic;margin-top:8px">ℹ️ '+note+'</div>';
   return html;
 }
 
@@ -1094,7 +1112,6 @@ function updateRateFields(sc){
   trips.forEach(function(t){primaries[t.cur||'USD']=1;});
   Object.keys(settings.rates||{}).forEach(function(k){primaries[k]=1;});
   delete primaries[prim]; // don't show primary vs itself
-  delete primaries[sc];   // don't show secondary vs itself
   var html='';
   Object.keys(primaries).sort().forEach(function(p){
     html+='<div class="field"><label>1 '+p+' = ? '+prim+'</label><input type="number" id="RF_'+p+'" value="'+(settings.rates[p]||'')+'" placeholder="e.g. 3.70" min="0" step="any"></div>';
@@ -2075,7 +2092,20 @@ document.getElementById('B_INSTALL').addEventListener('click',function(){
 });
 document.getElementById('B_INSTALL_CLOSE').addEventListener('click',function(){
   document.getElementById('INSTALL_BAR').style.display='none';
+  sSet('voy_ios_hint_closed','1');
 });
+
+// iPhone/iPad never get an Install button, so explain how to add the app manually
+(function(){
+  var ua=navigator.userAgent||'';
+  var isIOS=/iPhone|iPad|iPod/.test(ua)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+  var installed=window.navigator.standalone===true||(window.matchMedia&&window.matchMedia('(display-mode: standalone)').matches);
+  if(!isIOS||installed||sGet('voy_ios_hint_closed'))return;
+  var bar=document.getElementById('INSTALL_BAR');
+  bar.children[1].innerHTML='<div style="font-family:var(--fh);font-size:13px;font-weight:700">Install Voyager</div><div style="font-size:11px;color:var(--muted)">In Safari, tap Share (square with arrow ↑), then <b>Add to Home Screen</b></div>';
+  document.getElementById('B_INSTALL').style.display='none';
+  bar.style.display='flex';
+})();
 </script>
 </body>
 </html>

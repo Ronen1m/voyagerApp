@@ -1,4 +1,4 @@
-var CACHE = 'voyager-v5';
+var CACHE = 'voyager-v6'; // change this number every time you publish an update
 var FILES = [
   '/voyagerApp/',
   '/voyagerApp/index.html'
@@ -21,6 +21,8 @@ self.addEventListener('activate', function(e){
 });
 
 self.addEventListener('fetch', function(e){
+  // Never cache live flight data or non-GET requests
+  if (e.request.method !== 'GET' || e.request.url.indexOf('airlabs.co') >= 0) return;
   e.respondWith(
     caches.match(e.request).then(function(r){
       return r || fetch(e.request).then(function(res){
