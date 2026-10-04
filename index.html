@@ -868,7 +868,7 @@ function renderFlightDataSimple(f) {
   html += '<div class="flight-grid">';
 
   // Departure cell
-  var depTitle = (f.dep_iata||'—') + (f.dep_country ? ' <span style="font-weight:400;font-size:11px;color:var(--muted)">('+f.dep_country+')</span>' : '');
+  var depTitle = (f.dep_iata||'—') + (f.dep_country ? ' <span style="font-weight:400;font-size:11px;color:var(--muted)">('+countryName(f.dep_country)+')</span>' : '');
   var depDelay = f.dep_delay>0 ? ' <span style="color:var(--red);font-size:10px">+'+f.dep_delay+'m</span>' : '';
   html += '<div class="flight-cell">';
   html += '<div class="fc-label">Departure</div>';
@@ -892,7 +892,7 @@ function renderFlightDataSimple(f) {
   html += '</div>';
 
   // Arrival cell
-  var arrTitle = (f.arr_iata||'—') + (f.arr_country ? ' <span style="font-weight:400;font-size:11px;color:var(--muted)">('+f.arr_country+')</span>' : '');
+  var arrTitle = (f.arr_iata||'—') + (f.arr_country ? ' <span style="font-weight:400;font-size:11px;color:var(--muted)">('+countryName(f.arr_country)+')</span>' : '');
   var arrDelay = f.arr_delay>0 ? ' <span style="color:var(--red);font-size:10px">+'+f.arr_delay+'m</span>' : '';
   html += '<div class="flight-cell">';
   html += '<div class="fc-label">Arrival</div>';
