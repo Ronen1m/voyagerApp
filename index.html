@@ -2165,7 +2165,16 @@ renderHome();
 
 // PWA service worker - only on HTTPS hosted pages
 if('serviceWorker' in navigator && location.protocol === 'https:'){
-  navigator.serviceWorker.register('/voyagerApp/sw.js').catch(function(e){console.log('SW error',e);});
+  navigator.serviceWorker.register('/voyagerApp/sw.js', {updateViaCache:'none'}).then(function(reg){
+    reg.update();
+    // check for a new version whenever the app comes back to the screen
+    document.addEventListener('visibilitychange', function(){ if (document.visibilityState === 'visible') reg.update(); });
+  }).catch(function(e){console.log('SW error',e);});
+  // when a new version takes over, reload once so it shows right away
+  var hadController = !!navigator.serviceWorker.controller, reloaded = false;
+  navigator.serviceWorker.addEventListener('controllerchange', function(){
+    if (hadController && !reloaded) { reloaded = true; location.reload(); }
+  });
 }
 
 // Install banner
