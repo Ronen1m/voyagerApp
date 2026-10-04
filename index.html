@@ -151,7 +151,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--fb);min-height:100
 .flight-box-chevron{color:var(--muted);font-size:16px;transition:transform .2s;flex-shrink:0}
 .flight-box.open .flight-box-chevron{transform:rotate(90deg)}
 .flight-box-title{font-family:var(--fh);font-size:14px;font-weight:700;display:flex;align-items:center;gap:6px}
-.flight-refresh{background:rgba(59,130,246,0.15);border:1px solid rgba(59,130,246,0.3);border-radius:8px;padding:5px 10px;color:#60a5fa;font-size:11px;cursor:pointer;font-family:var(--fh);font-weight:600}
+.flight-refresh{background:rgba(59,130,246,0.15);border:1px solid rgba(59,130,246,0.3);border-radius:8px;padding:5px 10px;color:#60a5fa;font-size:14px;flex-shrink:0;white-space:nowrap;cursor:pointer;font-family:var(--fh);font-weight:600}
 .flight-status-badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;font-family:var(--fh)}
 .flight-status-badge.on-time{background:rgba(45,212,160,0.15);color:var(--green);border:1px solid rgba(45,212,160,0.3)}
 .flight-status-badge.delayed{background:rgba(240,82,82,0.15);color:var(--red);border:1px solid rgba(240,82,82,0.3)}
@@ -697,7 +697,7 @@ function refreshFlight(fn, date, boxId) {
     updateFlightBox(box, fn, cached);
     return;
   }
-  refreshBtn.textContent = '⟳ Loading...';
+  refreshBtn.textContent = '⟳';
   refreshBtn.disabled = true;
 
   // AirLabs flight info (free plan, ~1,000 lookups/month)
@@ -705,15 +705,19 @@ function refreshFlight(fn, date, boxId) {
   .then(function(r){ return r.json(); })
   .then(function(data){
     if (data.error || !data.response) {
-      throw new Error((data.error && data.error.message) || 'Flight not found');
+      var msg = (data.error && data.error.message) || 'Flight not found';
+      if (/not found/i.test(msg)) msg = 'NOTYET';
+      throw new Error(msg);
     }
     var f = data.response;
     var hhmm = function(v){ return v ? String(v).slice(11,16) : ''; };
+    var depT = f.dep_estimated || f.dep_actual || f.dep_time || '';
+    var arrT = f.arr_estimated || f.arr_actual || f.arr_time || '';
     var st = (f.status || 'scheduled').toLowerCase();
     if (st === 'en-route') st = 'active';
     var depDelay = f.dep_delayed || f.delayed || 0;
     if (depDelay > 0 && st === 'scheduled') st = 'delayed';
-    var depDate = f.dep_time ? String(f.dep_time).slice(0,10) : '';
+    var depDate = depT ? String(depT).slice(0,10) : '';
     var note = '';
     if (date && depDate && depDate !== date) {
       note = 'Live data is for the ' + fdate(depDate) + ' flight. Check again closer to your flight date.';
@@ -722,24 +726,26 @@ function refreshFlight(fn, date, boxId) {
       status: st,
       airline: f.airline_name || f.airline_iata || '',
       dep_airport: f.dep_name || '', dep_iata: f.dep_iata || '', dep_country: f.dep_country || '',
-      dep_time: hhmm(f.dep_estimated || f.dep_time), dep_terminal: f.dep_terminal || null,
+      dep_time: hhmm(depT), dep_terminal: f.dep_terminal || null,
       dep_gate: f.dep_gate || null, dep_counters: null, dep_delay: depDelay,
       arr_airport: f.arr_name || '', arr_iata: f.arr_iata || '', arr_country: f.arr_country || '',
-      arr_time: hhmm(f.arr_estimated || f.arr_time), arr_terminal: f.arr_terminal || null,
+      arr_time: hhmm(arrT), arr_terminal: f.arr_terminal || null,
       arr_gate: f.arr_gate || null, arr_delay: f.arr_delayed || 0,
       note: note, _at: Date.now()
     };
     flightCache[key] = flight;
     updateFlightBox(box, fn, flight);
-    refreshBtn.textContent = '↻ Refresh';
+    refreshBtn.textContent = '↻';
     refreshBtn.disabled = false;
   })
   .catch(function(e){
     console.log('Flight fetch error:', e);
-    refreshBtn.textContent = '↻ Refresh';
+    refreshBtn.textContent = '↻';
     refreshBtn.disabled = false;
     var body = box.querySelector('.flight-box-body');
-    if (body) body.innerHTML = '<div class="flight-error">Could not fetch flight data' + (e && e.message ? ' (' + e.message + ')' : '') + '. Try again.</div>';
+    if (body) body.innerHTML = (e && e.message === 'NOTYET')
+      ? '<div class="flight-error">No live data yet for ' + fn + '. Live status usually appears about a day before departure. Tap ↻ again then.</div>'
+      : '<div class="flight-error">Could not fetch flight data' + (e && e.message ? ' (' + e.message + ')' : '') + '. Try again.</div>';
     box.classList.add('open');
   });
 }
@@ -756,7 +762,7 @@ function updateFlightBox(box, fn, flight) {
   if (titleEl) {
     var dot = flight.status === 'cancelled' ? ' 🔴' : flight.status === 'delayed' ? ' 🟡' : flight.status === 'landed' ? ' ✅' : ' 🔵';
     // Remove old dot and add new
-    titleEl.innerHTML = titleEl.innerHTML.replace(/ [🔴🟡✅🔵]/g, '') + dot;
+    titleEl.innerHTML = titleEl.innerHTML.replace(/ (🔴|🟡|✅|🔵)/g, '') + dot;
   }
 }
 
