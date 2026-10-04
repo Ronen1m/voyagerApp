@@ -770,14 +770,21 @@ function refreshFlightADB(fn, date, boxId) {
   var day = date || toDateStr(new Date());
   var done = function(){ refreshBtn.textContent = '↻'; refreshBtn.disabled = false; };
 
-  fetch('https://aerodatabox.p.rapidapi.com/flights/number/' + encodeURIComponent(fn) + '/' + day + '?withAircraftImage=false&withLocation=false&dateLocalRole=Departure', {
-    headers: { 'x-rapidapi-key': RAPIDAPI_KEY, 'x-rapidapi-host': 'aerodatabox.p.rapidapi.com' }
-  })
-  .then(function(r){
-    if (r.status === 204 || r.status === 404) return [];
-    if (!r.ok) throw new Error('HTTP ' + r.status + (r.status === 429 ? ' – monthly limit reached' : ''));
-    return r.json();
-  })
+  // "LY094" -> "LY94": databases store flight numbers without leading zeros
+  var qfn = String(fn).toUpperCase().replace(/\s+/g,'');
+  var m = qfn.match(/^([A-Z]{2}|[A-Z]\d|\d[A-Z])(\d+)$/);
+  if (m) qfn = m[1] + String(parseInt(m[2], 10));
+  var adb = function(role){
+    return fetch('https://aerodatabox.p.rapidapi.com/flights/number/' + encodeURIComponent(qfn) + '/' + day + '?withAircraftImage=false&withLocation=false&dateLocalRole=' + role, {
+      headers: { 'x-rapidapi-key': RAPIDAPI_KEY, 'x-rapidapi-host': 'aerodatabox.p.rapidapi.com' }
+    }).then(function(r){
+      if (r.status === 204 || r.status === 404) return [];
+      if (!r.ok) throw new Error('HTTP ' + r.status + (r.status === 429 ? ' – monthly limit reached' : ''));
+      return r.json();
+    });
+  };
+  adb('Departure')
+  .then(function(list){ return (Array.isArray(list) && list.length) ? list : adb('Both'); })
   .then(function(list){
     if (!Array.isArray(list) || !list.length) throw new Error('NOTFOUND');
     var f = list[0], d = f.departure || {}, a = f.arrival || {};
