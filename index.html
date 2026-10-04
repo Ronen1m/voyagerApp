@@ -845,6 +845,15 @@ function updateFlightBox(box, fn, flight) {
   if (dotEl) dotEl.textContent = flightDot(flight.status);
 }
 
+// "AE" -> "United Arab Emirates" (uses the phone's built-in country names)
+function countryName(c) {
+  if (!c) return '';
+  if (/^[A-Za-z]{2}$/.test(c)) {
+    try { return new Intl.DisplayNames(['en'], {type:'region'}).of(c.toUpperCase()) || c; } catch(e) { return c; }
+  }
+  return c;
+}
+
 function renderFlightDataSimple(f) {
   if (!f) return '<div class="flight-error">No data available</div>';
   var status = (f.status || 'unknown').toLowerCase();
