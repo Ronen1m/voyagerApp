@@ -32,6 +32,20 @@ body{background:var(--bg);color:var(--text);font-family:var(--fb);min-height:100
 .tbtn.primary{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;border-color:transparent}
 .tbtn.danger{background:rgba(240,82,82,0.12);color:var(--red);border-color:transparent}
 .screen{display:none;padding:12px 14px 120px}.screen.on{display:block}
+.cd-card{position:relative;overflow:hidden;border-radius:var(--r);margin-bottom:14px;padding:14px 14px 16px;background:linear-gradient(135deg,rgba(240,165,0,0.16),rgba(224,92,42,0.10) 55%,rgba(26,37,53,0.6));border:1px solid rgba(240,165,0,0.35);cursor:pointer;user-select:none}
+.cd-card:active{transform:scale(0.99)}
+.cd-top{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.cd-icon{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
+.cd-kicker{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);font-weight:700}
+.cd-name{font-family:var(--fh);font-weight:700;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cd-date{font-size:11px;color:var(--muted)}
+.cd-units{display:grid;grid-template-columns:1fr auto 1fr auto 1fr;align-items:center;gap:6px}
+.cd-unit{background:rgba(15,25,35,0.55);border:1px solid var(--border);border-radius:12px;padding:10px 4px 8px;text-align:center}
+.cd-num{font-family:var(--fh);font-size:30px;font-weight:800;line-height:1;font-variant-numeric:tabular-nums;color:var(--text)}
+.cd-lbl{font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-top:6px}
+.cd-sep{font-family:var(--fh);font-size:24px;font-weight:800;color:var(--accent);opacity:.7}
+.cd-now{font-family:var(--fh);font-size:22px;font-weight:800;color:var(--green)}
+.cd-chip{display:inline-block;margin-left:6px;padding:1px 7px;border-radius:10px;background:rgba(240,165,0,0.14);color:var(--accent);font-size:10px;font-weight:700;vertical-align:1px}
 .trip-card{background:var(--surf);border:1px solid var(--border);border-radius:var(--r);margin-bottom:12px;overflow:hidden}
 .trip-head{display:flex;align-items:center;gap:12px;padding:14px;cursor:pointer;user-select:none}
 .trip-icon{width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0}
@@ -558,9 +572,11 @@ function renderHome(){
     return;
   }
   var sorted=trips.slice().sort(function(a,b){var da=a.start||'',db=b.start||'';if(sortAsc)return da>db?1:(da<db?-1:0);return db>da?1:(db<da?-1:0);});
-  var html='';
+  var html=countdownHTML();
   sorted.forEach(function(t){
     var cur=t.cur||'USD',nd=getDays(t).length;
+    var msl=tripStartMs(t.start)-Date.now(), dl=Math.floor(msl/86400000);
+    var chip=(msl>0)?'<span class="cd-chip">⏳ '+(dl<1?'&lt;1 day':dl+(dl===1?' day':' days'))+'</span>':'';
     var tot=tAll(t),gen=tGen(t),day=tDay(t),pd=nd>0?tot/nd:0;
     var prim=settings.prim||'ILS';
     var totP=toPrim(tot,cur),genP=toPrim(gen,cur),dayP=toPrim(day,cur),pdP=nd>0?toPrim(pd,cur):0;
@@ -572,7 +588,7 @@ function renderHome(){
     var iconContent=t.iconImage?'':t.emoji;
     html+='<div class="trip-icon" style="'+iconStyle+';">'+iconContent+'</div>';
     html+='<div class="trip-info"><div class="trip-name">'+t.name+'</div>';
-    html+='<div class="trip-sub">'+(t.start?fdate(t.start)+' to '+fdate(t.end):'No dates')+'<br>'+nd+' day'+(nd!==1?'s':'')+'</div></div>';
+    html+='<div class="trip-sub">'+(t.start?fdate(t.start)+' to '+fdate(t.end):'No dates')+'<br>'+nd+' day'+(nd!==1?'s':'')+chip+'</div></div>';
     html+='<div class="trip-amt">';
     html+='<div class="big">'+fmt(totP,prim)+'</div>';
     if(hasSec)html+='<div class="small">'+fmt(tot,cur)+'</div>';
@@ -591,7 +607,52 @@ function renderHome(){
     html+='</div></div></div>';
   });
   el.innerHTML=html;
+  tickCountdown();
 }
+
+// ══════════════════════ TRIP COUNTDOWN ══════════════════════
+function tripStartMs(d){ return d ? new Date(d+'T00:00:00').getTime() : NaN; }
+// The next trip that hasn't started yet, or a trip happening right now
+function countdownTrip(){
+  var now=Date.now(), today=toDateStr(new Date()), live=null, next=null;
+  trips.forEach(function(t){
+    if(!t.start) return;
+    if(t.start<=today && (t.end||t.start)>=today){ if(!live||t.start>live.start) live=t; }
+    else if(tripStartMs(t.start)>now){ if(!next||t.start<next.start) next=t; }
+  });
+  return next ? {t:next,live:false} : (live ? {t:live,live:true} : null);
+}
+function countdownHTML(){
+  var c=countdownTrip(); if(!c) return '';
+  var t=c.t, bg=t.color||DEF_COLOR;
+  var iconStyle=t.iconImage?'background:url('+t.iconImage+') center/cover no-repeat':'background:'+bg;
+  var h='<div class="cd-card" data-action="detail" data-id="'+t.id+'">';
+  h+='<div class="cd-top"><div class="cd-icon" style="'+iconStyle+'">'+(t.iconImage?'':(t.emoji||'✈️'))+'</div>';
+  h+='<div style="flex:1;min-width:0"><div class="cd-kicker">'+(c.live?'Happening now':'Next trip')+'</div>';
+  h+='<div class="cd-name">'+t.name+'</div><div class="cd-date">'+fdate(t.start)+(t.end?' to '+fdate(t.end):'')+'</div></div></div>';
+  if(c.live){
+    var nd=getDays(t).length, dn=getDays(t).indexOf(toDateStr(new Date()))+1;
+    h+='<div class="cd-now">🌍 Day '+(dn>0?dn:1)+' of '+nd+' · Enjoy!</div>';
+  } else {
+    h+='<div class="cd-units" id="CD_UNITS" data-start="'+t.start+'">';
+    h+='<div class="cd-unit"><div class="cd-num" id="CD_D">0</div><div class="cd-lbl">Days</div></div><div class="cd-sep">:</div>';
+    h+='<div class="cd-unit"><div class="cd-num" id="CD_H">00</div><div class="cd-lbl">Hours</div></div><div class="cd-sep">:</div>';
+    h+='<div class="cd-unit"><div class="cd-num" id="CD_M">00</div><div class="cd-lbl">Minutes</div></div></div>';
+  }
+  return h+'</div>';
+}
+function tickCountdown(){
+  var u=document.getElementById('CD_UNITS'); if(!u) return;
+  var left=tripStartMs(u.dataset.start)-Date.now();
+  if(left<=0){ renderHome(); return; }   // trip started: switch to "Happening now"
+  var mins=Math.floor(left/60000), d=Math.floor(mins/1440), hh=Math.floor((mins%1440)/60), mm=mins%60;
+  var p=function(n){return (n<10?'0':'')+n;};
+  document.getElementById('CD_D').textContent=d;
+  document.getElementById('CD_H').textContent=p(hh);
+  document.getElementById('CD_M').textContent=p(mm);
+}
+setInterval(tickCountdown, 15000);
+document.addEventListener('visibilitychange', function(){ if(document.visibilityState==='visible') tickCountdown(); });
 
 // ══════════════════════ FLIGHT STATUS ══════════════════════
 var RAPIDAPI_KEY = '23eb400c35msh06f50139eaa50b5p11e6b4jsneb0dba866e16'; // AeroDataBox via RapidAPI: supports future dates
