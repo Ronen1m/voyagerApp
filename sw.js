@@ -1,4 +1,4 @@
-var CACHE = 'voyager-v16'; // change this number every time you publish an update
+var CACHE = 'voyager-v17'; // change this number every time you publish an update
 var FILES = [
   '/voyagerApp/',
   '/voyagerApp/index.html'
