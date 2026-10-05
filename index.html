@@ -157,6 +157,30 @@ body{background:var(--bg);color:var(--text);font-family:var(--fb);min-height:100
 .cat-bar-bg{height:5px;border-radius:3px;background:var(--surf2);overflow:hidden}
 .cat-bar-fill{height:100%;border-radius:3px}
 .rate-note{background:rgba(45,212,160,0.08);border:1px solid rgba(45,212,160,0.2);border-radius:10px;padding:10px 12px;font-size:12px;color:var(--green);margin-bottom:12px}
+.pass-block{margin:12px 0 4px;display:flex;flex-direction:column;gap:6px}
+.pass-row{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;background:rgba(240,165,0,0.08);border:1px solid rgba(240,165,0,0.3);cursor:pointer;user-select:none}
+.pass-row:active{background:rgba(240,165,0,0.16)}
+.pass-name{font-family:var(--fh);font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pass-bits{font-size:11px;color:var(--muted);margin-top:2px}
+.pass-open{font-size:12px;font-weight:700;color:var(--accent);flex-shrink:0}
+.pass-chip{background:rgba(240,165,0,0.15);border:1px solid rgba(240,165,0,0.4);border-radius:8px;padding:5px 8px;color:var(--accent);font-size:12px;font-weight:700;cursor:pointer;flex-shrink:0;white-space:nowrap}
+.add-pass-btn{width:100%;margin:2px 0 12px;padding:10px;background:transparent;border:1px dashed rgba(240,165,0,0.45);border-radius:12px;color:var(--accent);font-family:var(--fh);font-size:13px;font-weight:600;cursor:pointer}
+.pass-card{background:var(--surf2);border:1px solid var(--border);border-radius:12px;padding:12px;margin-bottom:10px}
+.pass-file{font-size:12px;font-weight:600;margin-bottom:6px;word-break:break-all}
+.pass-info{font-size:12px;color:var(--green);margin-bottom:10px}
+.pass-warn{font-size:12px;color:var(--accent);margin-bottom:10px}
+.pass-busy{padding:24px 0;text-align:center;color:var(--muted);font-size:13px}
+#PASS_VIEW{position:fixed;inset:0;z-index:1000;background:#0b0f14;display:none;flex-direction:column}
+#PASS_VIEW.on{display:flex}
+.pv-top,.pv-bottom{display:flex;align-items:center;gap:8px;padding:10px 12px;background:#121a24}
+.pv-top{padding-top:max(10px,env(safe-area-inset-top))}
+.pv-bottom{justify-content:space-between;padding-bottom:max(12px,env(safe-area-inset-bottom))}
+.pv-title{font-family:var(--fh);font-weight:700;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pv-sub{font-size:11px;color:var(--muted)}
+.pv-btn{background:var(--surf2);border:1px solid var(--border);border-radius:10px;color:var(--text);padding:9px 12px;font-size:13px;font-family:var(--fb);cursor:pointer;text-decoration:none}
+#PV_BODY{flex:1;overflow:auto;-webkit-overflow-scrolling:touch;padding:10px;background:#fff}
+#PV_BODY img{display:block;width:100%;height:auto;margin:0 auto 10px;max-width:900px}
+#PV_BODY .pass-busy{color:#555}
 .flight-box{background:var(--surf);border:1px solid rgba(59,130,246,0.4);border-radius:14px;padding:0;margin-bottom:10px;overflow:hidden}
 .flight-box-head{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;cursor:pointer;user-select:none}
 .flight-box-head:active{background:rgba(255,255,255,0.03)}
@@ -382,6 +406,33 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(.5)}
   </div>
 </div>
 
+<div class="overlay" id="OVL_PASS">
+  <div class="sheet">
+    <div class="handle"></div>
+    <h2>🎫 Boarding Passes</h2>
+    <div id="PASS_REVIEW"></div>
+    <div style="font-size:11px;color:var(--muted);margin:4px 0 12px">Files stay on this phone only.</div>
+    <div class="btn2">
+      <button class="cancel" id="B_PASS_CANCEL">Cancel</button>
+      <button class="ok" id="B_PASS_SAVE">Save</button>
+    </div>
+  </div>
+</div>
+<div id="PASS_VIEW">
+  <div class="pv-top">
+    <button class="pv-btn" id="PV_CLOSE">✕</button>
+    <div style="flex:1;min-width:0;text-align:center"><div id="PV_TITLE" class="pv-title"></div><div id="PV_SUB" class="pv-sub"></div></div>
+    <span id="PV_COUNT" class="pv-sub" style="min-width:34px;text-align:right"></span>
+  </div>
+  <div id="PV_BODY"></div>
+  <div class="pv-bottom">
+    <button class="pv-btn" id="PV_PREV">‹ Prev</button>
+    <a class="pv-btn" id="PV_OPEN" target="_blank" rel="noopener">Open file</a>
+    <button class="pv-btn" id="PV_DEL">🗑</button>
+    <button class="pv-btn" id="PV_NEXT">Next ›</button>
+  </div>
+</div>
+<input type="file" id="F_PASS_FILE" accept="application/pdf,image/*,.pdf" multiple style="display:none">
 <div class="overlay" id="OVL_NOTES">
   <div class="sheet">
     <div class="handle"></div>
@@ -658,6 +709,304 @@ function tickCountdown(){
 setInterval(tickCountdown, 15000);
 document.addEventListener('visibilitychange', function(){ if(document.visibilityState==='visible') tickCountdown(); });
 
+// ══════════════════════ BOARDING PASSES ══════════════════════
+// Files are kept only on this device (IndexedDB). Trip data holds the parsed details.
+var PDFJS_URL='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+var PDFJS_WORKER='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+var ZXING_URL='https://unpkg.com/@zxing/library@0.21.3/umd/index.min.js';
+var _scriptCache={};
+function loadScript(src){
+  if(!_scriptCache[src]) _scriptCache[src]=new Promise(function(res,rej){
+    var s=document.createElement('script');s.src=src;s.onload=res;s.onerror=function(){delete _scriptCache[src];rej(new Error('Could not load '+src.split('/').pop()+' (are you online?)'));};
+    document.head.appendChild(s);
+  });
+  return _scriptCache[src];
+}
+function loadPdfJs(){return loadScript(PDFJS_URL).then(function(){window.pdfjsLib.GlobalWorkerOptions.workerSrc=PDFJS_WORKER;return window.pdfjsLib;});}
+function loadZXing(){return loadScript(ZXING_URL).then(function(){return window.ZXing;});}
+
+// --- tiny IndexedDB wrapper ---
+var _idb=null;
+function idb(){
+  if(!_idb) _idb=new Promise(function(res,rej){
+    var r=indexedDB.open('voyager-files',1);
+    r.onupgradeneeded=function(){r.result.createObjectStore('passes');};
+    r.onsuccess=function(){res(r.result);};r.onerror=function(){rej(r.error);};
+  });
+  return _idb;
+}
+function idbDo(mode,fn){return idb().then(function(db){return new Promise(function(res,rej){
+  var tx=db.transaction('passes',mode),st=tx.objectStore('passes'),req=fn(st);
+  tx.oncomplete=function(){res(req&&req.result);};tx.onerror=function(){rej(tx.error);};
+});});}
+function idbPut(id,v){return idbDo('readwrite',function(s){return s.put(v,id);});}
+function idbGet(id){return idbDo('readonly',function(s){return s.get(id);});}
+function idbDel(id){return idbDo('readwrite',function(s){return s.delete(id);}).catch(function(){});}
+
+function normFn(fn){
+  var q=String(fn||'').toUpperCase().replace(/\s+/g,'');
+  var m=q.match(/^([A-Z]{2}|[A-Z]\d|\d[A-Z])0*(\d{1,4})$/);
+  return m?m[1]+m[2]:q;
+}
+function titleCase(s){return String(s||'').toLowerCase().replace(/(^|[\s\-'])([a-zÀ-ɏ])/g,function(a,b,c){return b+c.toUpperCase();});}
+var MONTHS=['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+
+// IATA BCBP barcode (the code printed on every boarding pass)
+function parseBCBP(s){
+  if(!s||s.charAt(0)!=='M'||s.length<58) return null;
+  var name=s.substr(2,20).trim(), parts=name.split('/');
+  var full=parts.length>1?titleCase(parts[1].replace(/\s+(MR|MRS|MS|MISS|MSTR|DR)$/i,'')+' '+parts[0]):titleCase(name);
+  var carrier=s.substr(36,3).trim(), num=s.substr(39,5).trim().replace(/^0+/,'');
+  var jd=parseInt(s.substr(44,3),10), seat=s.substr(48,4).trim().replace(/^0+/,'');
+  return {name:full,pnr:s.substr(23,7).trim(),from:s.substr(30,3).trim(),to:s.substr(33,3).trim(),
+          fn:carrier&&num?normFn(carrier+num):'',julian:isNaN(jd)?null:jd,seat:seat,cls:s.charAt(47)};
+}
+function julianToDate(jd,near){
+  var base=near?new Date(near+'T00:00:00'):new Date(), best=null;
+  [-1,0,1].forEach(function(dy){
+    var d=new Date(base.getFullYear()+dy,0,1);d.setDate(jd);
+    if(!best||Math.abs(d-base)<Math.abs(best-base))best=d;
+  });
+  return toDateStr(best);
+}
+
+// Read labelled values from the PDF layout ("Gate" with "B12" under it, etc.)
+var PASS_LABELS={from:['from','origin'],to:['to','destination'],fn:['flight','flight no','flight no.','flight number'],
+  time:['departure','departure time','departs','dep','std'],seat:['seat','seat no'],gate:['gate'],terminal:['terminal'],
+  boarding:['boarding','boarding time','gate opens','boarding starts'],gateClose:['gate closes'],name:['passenger','name','passenger name'],
+  cls:['class','cabin'],date:['date','flight date']};
+var PASS_VALID={from:/^[A-Z]{3}$/,to:/^[A-Z]{3}$/,fn:/^([A-Z]{2}|[A-Z]\d|\d[A-Z])\s?\d{1,4}$/,time:/^([01]?\d|2[0-3])[:.][0-5]\d$/,
+  seat:/^\d{1,2}[A-K]$/,gate:/^[A-Z]{0,2}\d{1,3}[A-Z]?$/,terminal:/^[A-Z0-9]{1,3}$/,boarding:/^([01]?\d|2[0-3])[:.][0-5]\d$/,
+  gateClose:/^([01]?\d|2[0-3])[:.][0-5]\d$/,name:/^[A-Za-zÀ-ɏ'\-\/ ]{3,}$/,cls:/^.{1,20}$/,date:/\d/};
+function parsePassText(items){
+  var out={},labelOf={};
+  items.forEach(function(it,i){
+    var low=it.s.toLowerCase().replace(/[:：]$/,'').trim();
+    Object.keys(PASS_LABELS).forEach(function(k){if(PASS_LABELS[k].indexOf(low)>=0)labelOf[i]=k;});
+    var m=it.s.match(/^(gate|seat|terminal|boarding)\s*[:.]\s*(\S+)$/i);
+    if(m){var k2=m[1].toLowerCase(),v2=m[2].toUpperCase();if(PASS_VALID[k2].test(v2)&&!out[k2])out[k2]=v2;}
+  });
+  Object.keys(labelOf).forEach(function(i){
+    var L=items[i],k=labelOf[i],best=null,bd=1e9;
+    items.forEach(function(it,j){
+      if(j==i||labelOf[j])return;
+      var dy=it.y-L.y,dx=Math.abs(it.x-L.x);
+      if(dy>4&&dy<45&&dx<20&&dy<bd){bd=dy;best=it;}
+    });
+    if(!best||out[k])return;
+    var v=k==='name'||k==='cls'?best.s:best.s.toUpperCase().replace(/\s+/g,k==='fn'?'':' ');
+    if(PASS_VALID[k].test(v))out[k]=v.replace('.',':');
+  });
+  var all=items.map(function(i){return i.s;}).join(' ');
+  var dm=all.match(/\b(\d{1,2})\s?(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)[A-Z]*\.?\s?(\d{2,4})?\b/i);
+  if(dm){var y=dm[3]?(dm[3].length===2?'20'+dm[3]:dm[3]):String(new Date().getFullYear());
+    var mo=MONTHS.indexOf(dm[2].toUpperCase())+1;out.date=y+'-'+(mo<10?'0':'')+mo+'-'+(dm[1].length<2?'0':'')+dm[1];}
+  else delete out.date;
+  if(out.fn)out.fn=normFn(out.fn);
+  return out;
+}
+
+// Try to read the barcode from a canvas (whole image, then likely areas)
+function decodeBarcode(canvas){
+  return loadZXing().then(function(Z){
+    var hints=new Map();hints.set(Z.DecodeHintType.TRY_HARDER,true);
+    hints.set(Z.DecodeHintType.POSSIBLE_FORMATS,[Z.BarcodeFormat.QR_CODE,Z.BarcodeFormat.AZTEC,Z.BarcodeFormat.PDF_417,Z.BarcodeFormat.DATA_MATRIX]);
+    var ctx=canvas.getContext('2d'),W=canvas.width,H=canvas.height;
+    var regions=[[0,0,1,1],[0,0,1,.5],[0,.5,1,.5],[.5,0,.5,.5],[0,0,.5,.5],[.5,.5,.5,.5],[0,.5,.5,.5],[.25,.25,.5,.5],[.6,.1,.4,.35]];
+    for(var r=0;r<regions.length;r++){
+      var g=regions[r],x=Math.floor(g[0]*W),y=Math.floor(g[1]*H),w=Math.floor(g[2]*W),h=Math.floor(g[3]*H);
+      var d=ctx.getImageData(x,y,w,h).data,lum=new Uint8ClampedArray(w*h);
+      for(var p=0;p<lum.length;p++)lum[p]=(d[p*4]*299+d[p*4+1]*587+d[p*4+2]*114)/1000;
+      var bins=[Z.HybridBinarizer,Z.GlobalHistogramBinarizer];
+      for(var b=0;b<bins.length;b++){
+        try{var rd=new Z.MultiFormatReader();rd.setHints(hints);
+          return rd.decode(new Z.BinaryBitmap(new bins[b](new Z.RGBLuminanceSource(lum,w,h)))).getText();}catch(e){}
+      }
+    }
+    return null;
+  }).catch(function(){return null;});
+}
+function canvasToBlob(c,type,q){return new Promise(function(res){c.toBlob(res,type||'image/png',q);});}
+function fileToImage(file){return new Promise(function(res,rej){var u=URL.createObjectURL(file),im=new Image();im.onload=function(){res(im);};im.onerror=function(){rej(new Error('Unsupported image'));};im.src=u;});}
+
+function processPassFile(file,tripStart){
+  var isPdf=/pdf/i.test(file.type)||/\.pdf$/i.test(file.name);
+  var result={file:file,pages:[],meta:{}};
+  var work;
+  if(isPdf){
+    work=loadPdfJs().then(function(pdfjs){return file.arrayBuffer().then(function(buf){return pdfjs.getDocument({data:buf}).promise;});})
+    .then(function(doc){
+      var n=Math.min(doc.numPages,4),chain=Promise.resolve(),items=[],firstCanvas=null,yOff=0;
+      for(var i=1;i<=n;i++)(function(i){chain=chain.then(function(){return doc.getPage(i).then(function(page){
+        var vp1=page.getViewport({scale:1}),vp=page.getViewport({scale:2});
+        var c=document.createElement('canvas');c.width=vp.width;c.height=vp.height;
+        var ctx=c.getContext('2d');ctx.fillStyle='#fff';ctx.fillRect(0,0,c.width,c.height);
+        return page.render({canvasContext:ctx,viewport:vp}).promise.then(function(){
+          if(!firstCanvas)firstCanvas=c;
+          return page.getTextContent();
+        }).then(function(tc){
+          tc.items.forEach(function(it){if(!it.str||!it.str.trim())return;
+            var pt=vp1.convertToViewportPoint(it.transform[4],it.transform[5]);items.push({s:it.str.trim(),x:pt[0],y:pt[1]+yOff});});
+          yOff+=vp1.height+100;
+          return canvasToBlob(c).then(function(b){result.pages.push(b);});
+        });
+      });});})(i);
+      return chain.then(function(){result.items=items;return firstCanvas;});
+    });
+  } else {
+    work=fileToImage(file).then(function(im){
+      var s=Math.min(1,2200/Math.max(im.width,im.height)),c=document.createElement('canvas');
+      c.width=Math.round(im.width*s);c.height=Math.round(im.height*s);
+      var ctx=c.getContext('2d');ctx.fillStyle='#fff';ctx.fillRect(0,0,c.width,c.height);ctx.drawImage(im,0,0,c.width,c.height);
+      result.items=[];
+      return c;
+    });
+  }
+  return work.then(function(canvas){
+    return (canvas?decodeBarcode(canvas):Promise.resolve(null)).then(function(code){
+      var t=parsePassText(result.items||[]),b=parseBCBP(code)||{},m={};
+      m.fn=b.fn||t.fn||'';m.from=b.from||t.from||'';m.to=b.to||t.to||'';
+      m.date=t.date||(b.julian?julianToDate(b.julian,tripStart):'');
+      m.name=b.name||(t.name?titleCase(t.name):'');m.seat=b.seat||t.seat||'';
+      m.gate=t.gate||'';m.terminal=t.terminal||'';m.time=t.time||'';m.boarding=t.boarding||'';
+      m.gateClose=t.gateClose||'';m.cls=t.cls||'';m.pnr=b.pnr||'';
+      m.found=!!(code||t.fn);
+      result.meta=m;return result;
+    });
+  });
+}
+
+// --- add / review flow ---
+var _passQueue=[];
+function addPasses(){document.getElementById('F_PASS_FILE').value='';document.getElementById('F_PASS_FILE').click();}
+function handlePassFiles(files){
+  var t=getTrip(curTripId);if(!t||!files||!files.length)return;
+  _passQueue=[];
+  var list=document.getElementById('PASS_REVIEW');
+  list.innerHTML='<div class="pass-busy">⏳ Reading '+files.length+' file'+(files.length>1?'s':'')+'…</div>';
+  openOvl('OVL_PASS');
+  var chain=Promise.resolve();
+  Array.prototype.forEach.call(files,function(f){
+    chain=chain.then(function(){return processPassFile(f,t.start).catch(function(err){
+      return {file:f,pages:[],meta:{found:false},error:err.message};
+    });}).then(function(r){_passQueue.push(r);});
+  });
+  chain.then(renderPassReview);
+}
+function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
+function renderPassReview(){
+  var html='';
+  _passQueue.forEach(function(r,i){
+    var m=r.meta||{};
+    var route=(m.from||m.to)?esc(m.from||'?')+' → '+esc(m.to||'?'):'';
+    var info=[route,m.date?fdate(m.date):'',m.time?'🕐 '+esc(m.time):'',m.terminal?'Terminal '+esc(m.terminal):'',m.boarding?'Boarding '+esc(m.boarding):''].filter(Boolean).join(' · ');
+    html+='<div class="pass-card">';
+    html+='<div class="pass-file">📄 '+esc(r.file.name)+'</div>';
+    if(r.error)html+='<div class="pass-warn">⚠️ '+esc(r.error)+'</div>';
+    else if(!m.found)html+='<div class="pass-warn">Couldn\'t read the details automatically. Please type the flight number.</div>';
+    if(info)html+='<div class="pass-info">'+info+'</div>';
+    html+='<div class="frow"><div class="field"><label>Flight</label><input data-pq="'+i+'" data-k="fn" value="'+esc(m.fn)+'" placeholder="LY375" style="text-transform:uppercase"></div>';
+    html+='<div class="field"><label>Passenger</label><input data-pq="'+i+'" data-k="name" value="'+esc(m.name)+'" placeholder="Name"></div></div>';
+    html+='<div class="frow"><div class="field"><label>Seat</label><input data-pq="'+i+'" data-k="seat" value="'+esc(m.seat)+'" placeholder="3K"></div>';
+    html+='<div class="field"><label>Gate</label><input data-pq="'+i+'" data-k="gate" value="'+esc(m.gate)+'" placeholder="Not yet"></div></div>';
+    html+='</div>';
+  });
+  document.getElementById('PASS_REVIEW').innerHTML=html||'<div class="pass-busy">No files</div>';
+}
+function savePasses(){
+  var t=getTrip(curTripId);if(!t)return;
+  document.querySelectorAll('#PASS_REVIEW input[data-pq]').forEach(function(inp){
+    var r=_passQueue[+inp.dataset.pq];if(r)r.meta[inp.dataset.k]=inp.value.trim();
+  });
+  var missing=_passQueue.filter(function(r){return !r.meta.fn;});
+  if(missing.length){toast('Please enter the flight number');return;}
+  if(!t.passes)t.passes=[];
+  var jobs=_passQueue.map(function(r,i){
+    var id='bp'+Date.now()+'_'+i,m=r.meta;
+    var meta={id:id,fn:normFn(m.fn),from:m.from||'',to:m.to||'',date:m.date||'',time:m.time||'',name:m.name||'',
+      seat:(m.seat||'').toUpperCase(),gate:(m.gate||'').toUpperCase(),terminal:m.terminal||'',boarding:m.boarding||'',
+      gateClose:m.gateClose||'',cls:m.cls||'',pnr:m.pnr||'',fileName:r.file.name,fileType:r.file.type||''};
+    return idbPut(id,{orig:r.file,pages:r.pages}).then(function(){t.passes.push(meta);});
+  });
+  Promise.all(jobs).then(function(){
+    save();closeOvl('OVL_PASS');_passQueue=[];renderFlightBoxes();
+    toast('🎫 Boarding pass'+(jobs.length>1?'es':'')+' saved');
+  }).catch(function(e){toast('Could not save file: '+e.message);});
+}
+
+// --- show in flight box ---
+function passesFor(t,fn){var n=normFn(fn);return (t&&t.passes||[]).filter(function(p){return p.fn===n;});}
+function passBlockHTML(fn){
+  var ps=passesFor(getTrip(curTripId),fn);if(!ps.length)return '';
+  var h='<div class="pass-block">';
+  ps.forEach(function(p){
+    var bits=[p.seat?'💺 '+esc(p.seat):'',p.gate?'🚪 Gate '+esc(p.gate):'',p.boarding?'⏱ Boarding '+esc(p.boarding):'',p.terminal?'🏛 T'+esc(p.terminal):''].filter(Boolean).join('  ');
+    h+='<div class="pass-row" data-action="show-pass" data-fn="'+esc(fn)+'" data-pid="'+p.id+'"><div style="min-width:0;flex:1"><div class="pass-name">🎫 '+esc(p.name||'Passenger')+'</div>'+(bits?'<div class="pass-bits">'+bits+'</div>':'')+'</div><span class="pass-open">Show ›</span></div>';
+  });
+  return h+'</div>';
+}
+
+// --- full-screen viewer ---
+var _pv={list:[],i:0,urls:[],lock:null};
+function showPasses(fn,pid){
+  var ps=passesFor(getTrip(curTripId),fn);if(!ps.length)return;
+  _pv.list=ps;_pv.i=Math.max(0,ps.findIndex(function(p){return p.id===pid;}));
+  document.getElementById('PASS_VIEW').classList.add('on');
+  try{if(navigator.wakeLock)navigator.wakeLock.request('screen').then(function(l){_pv.lock=l;}).catch(function(){});}catch(e){}
+  renderPassView();
+}
+function closePassView(){
+  document.getElementById('PASS_VIEW').classList.remove('on');
+  _pv.urls.forEach(function(u){URL.revokeObjectURL(u);});_pv.urls=[];
+  if(_pv.lock){try{_pv.lock.release();}catch(e){}_pv.lock=null;}
+}
+function renderPassView(){
+  var p=_pv.list[_pv.i];if(!p)return closePassView();
+  _pv.urls.forEach(function(u){URL.revokeObjectURL(u);});_pv.urls=[];
+  document.getElementById('PV_TITLE').textContent=(p.name||'Passenger');
+  document.getElementById('PV_SUB').textContent=[p.fn,(p.from&&p.to)?p.from+' → '+p.to:'',p.seat?'Seat '+p.seat:'',p.gate?'Gate '+p.gate:''].filter(Boolean).join(' · ');
+  document.getElementById('PV_COUNT').textContent=_pv.list.length>1?(_pv.i+1)+' / '+_pv.list.length:'';
+  document.getElementById('PV_PREV').style.visibility=_pv.i>0?'visible':'hidden';
+  document.getElementById('PV_NEXT').style.visibility=_pv.i<_pv.list.length-1?'visible':'hidden';
+  var body=document.getElementById('PV_BODY');body.innerHTML='<div class="pass-busy">Loading…</div>';
+  idbGet(p.id).then(function(rec){
+    if(!rec){body.innerHTML='<div class="pass-busy">File not found on this device.</div>';return;}
+    var imgs=(rec.pages&&rec.pages.length)?rec.pages:(/^image\//.test(p.fileType)||!/pdf/i.test(p.fileType)?[rec.orig]:[]);
+    var h='';
+    imgs.forEach(function(b){var u=URL.createObjectURL(b);_pv.urls.push(u);h+='<img src="'+u+'" alt="Boarding pass">';});
+    if(!imgs.length)h='<div class="pass-busy">Preview not available.</div>';
+    var ou=URL.createObjectURL(rec.orig);_pv.urls.push(ou);
+    document.getElementById('PV_OPEN').href=ou;document.getElementById('PV_OPEN').download=p.fileName||'boarding-pass';
+    body.innerHTML=h;body.scrollTop=0;
+  }).catch(function(e){body.innerHTML='<div class="pass-busy">'+esc(e.message)+'</div>';});
+}
+function deleteCurrentPass(){
+  var p=_pv.list[_pv.i],t=getTrip(curTripId);if(!p||!t)return;
+  if(!confirm('Delete this boarding pass?'))return;
+  t.passes=(t.passes||[]).filter(function(x){return x.id!==p.id;});idbDel(p.id);save();
+  _pv.list.splice(_pv.i,1);if(_pv.i>=_pv.list.length)_pv.i=_pv.list.length-1;
+  renderFlightBoxes();
+  if(!_pv.list.length)closePassView();else renderPassView();
+}
+
+// --- backup support: pack/unpack files as text ---
+function blobToDataURL(b){return new Promise(function(res){var r=new FileReader();r.onload=function(){res(r.result);};r.readAsDataURL(b);});}
+function dataURLToBlob(u){var a=u.split(','),mime=(a[0].match(/:(.*?);/)||[])[1]||'application/octet-stream',bin=atob(a[1]),arr=new Uint8Array(bin.length);for(var i=0;i<bin.length;i++)arr[i]=bin.charCodeAt(i);return new Blob([arr],{type:mime});}
+function packPassFiles(){
+  var out={},jobs=[];
+  trips.forEach(function(t){(t.passes||[]).forEach(function(p){
+    jobs.push(idbGet(p.id).then(function(rec){if(!rec)return;
+      return blobToDataURL(rec.orig).then(function(o){return Promise.all((rec.pages||[]).map(blobToDataURL)).then(function(pg){out[p.id]={orig:o,pages:pg};});});
+    }).catch(function(){}));
+  });});
+  return Promise.all(jobs).then(function(){return out;});
+}
+function unpackPassFiles(obj){
+  if(!obj)return Promise.resolve();
+  return Promise.all(Object.keys(obj).map(function(id){var r=obj[id];
+    return idbPut(id,{orig:dataURLToBlob(r.orig),pages:(r.pages||[]).map(dataURLToBlob)});})).catch(function(){});
+}
+
 // ══════════════════════ FLIGHT STATUS ══════════════════════
 var RAPIDAPI_KEY = '23eb400c35msh06f50139eaa50b5p11e6b4jsneb0dba866e16'; // AeroDataBox via RapidAPI: supports future dates
 var AIRLABS_KEY = 'b3bfd801-c49c-4e67-95bd-ee9e0c0147fd';
@@ -714,41 +1063,48 @@ function renderFlightBoxes() {
   if (t.end && t.end < today) { container.innerHTML = ''; return; }
 
   var flights = (t.gen || []).filter(function(e) { return e.type === 'flight'; });
-  if (!flights.length) { container.innerHTML = ''; return; }
+  var passes = t.passes || [];
+  if (!flights.length && !passes.length) { container.innerHTML = '<button class="add-pass-btn" data-action="add-pass">🎫 Add boarding passes</button>'; return; }
 
-  var html = '';
+  // Flights from expense descriptions (1st = outbound, 2nd = return)
+  var boxes = [], seen = {};
   flights.forEach(function(e, ei) {
-    var fns = extractFlightNumbers(e.desc || '');
-    if (!fns.length) return;
-
-    fns.forEach(function(fn, fi) {
-      var fd = fi === 0 ? (e.dateFrom || t.start || '') : (e.dateTo || t.end || '');
-      var label = fi === 0 ? '✈️ Outbound' : '🔄 Return';
-      var boxId = 'FB_' + ei + '_' + fi;
-      var cached = flightCache[fn + '_' + (fd || '')];
-      var dateStr = fd ? ' <span style="font-size:10px;color:var(--muted);font-weight:400">· ' + fdate(fd) + '</span>' : '';
-      var statusDot = cached ? flightDot(cached.status) : '';
-
-      html += '<div class="flight-box" id="' + boxId + '">';
-      // Collapsible header - click to expand
-      html += '<div class="flight-box-head" data-action="toggle-flight" data-box="' + boxId + '">';
-      html += '<div class="flight-box-title">' + label + ' · <span style="color:#60a5fa">' + fn + '</span><span class="fb-dot">' + statusDot + '</span>' + dateStr + '</div>';
-      html += '<div style="display:flex;align-items:center;gap:8px">';
-      html += '<button class="flight-refresh" data-action="refresh-flight" data-fn="' + fn + '" data-date="' + (fd||'') + '" data-box="' + boxId + '">↻</button>';
-      html += '<span class="flight-box-chevron">›</span>';
-      html += '</div></div>';
-      // Collapsible body
-      html += '<div class="flight-box-body" id="FBB_' + boxId + '">';
-      if (cached) {
-        html += renderFlightDataSimple(cached);
-      } else {
-        html += '<div class="flight-error" style="padding:12px 0">Tap ↻ to load live flight data</div>';
-      }
-      html += '</div>';
-      html += '</div>';
+    extractFlightNumbers(e.desc || '').forEach(function(fn, fi) {
+      boxes.push({fn: fn, date: fi === 0 ? (e.dateFrom || t.start || '') : (e.dateTo || t.end || ''),
+                  label: fi === 0 ? '✈️ Outbound' : '🔄 Return', id: 'FB_' + ei + '_' + fi});
+      seen[normFn(fn)] = true;
     });
   });
-  container.innerHTML = html || '';
+  // Flights that only have a boarding pass
+  passes.forEach(function(p, pi) {
+    if (seen[p.fn]) return;
+    seen[p.fn] = true;
+    boxes.push({fn: p.fn, date: p.date || '', label: '✈️ Flight', id: 'FBP_' + pi});
+  });
+
+  var html = '';
+  boxes.forEach(function(b) {
+    var fn = b.fn, fd = b.date, boxId = b.id;
+    var cached = flightCache[fn + '_' + (fd || '')];
+    var dateStr = fd ? ' <span style="font-size:10px;color:var(--muted);font-weight:400">· ' + fdate(fd) + '</span>' : '';
+    var statusDot = cached ? flightDot(cached.status) : '';
+    var np = passesFor(t, fn).length;
+
+    html += '<div class="flight-box" id="' + boxId + '">';
+    html += '<div class="flight-box-head" data-action="toggle-flight" data-box="' + boxId + '">';
+    html += '<div class="flight-box-title">' + b.label + ' · <span style="color:#60a5fa">' + fn + '</span><span class="fb-dot">' + statusDot + '</span>' + dateStr + '</div>';
+    html += '<div style="display:flex;align-items:center;gap:8px">';
+    if (np) html += '<button class="pass-chip" data-action="show-pass" data-fn="' + fn + '">🎫' + (np > 1 ? ' ' + np : '') + '</button>';
+    html += '<button class="flight-refresh" data-action="refresh-flight" data-fn="' + fn + '" data-date="' + (fd||'') + '" data-box="' + boxId + '">↻</button>';
+    html += '<span class="flight-box-chevron">›</span>';
+    html += '</div></div>';
+    html += '<div class="flight-box-body" id="FBB_' + boxId + '">';
+    html += passBlockHTML(fn);
+    html += cached ? renderFlightDataSimple(cached) : '<div class="flight-error" style="padding:12px 0">Tap ↻ to load live flight data</div>';
+    html += '</div></div>';
+  });
+  html += '<button class="add-pass-btn" data-action="add-pass">🎫 Add boarding passes</button>';
+  container.innerHTML = html;
 }
 
 var flightCache = {};
@@ -901,7 +1257,7 @@ function refreshFlightADB(fn, date, boxId) {
 function updateFlightBox(box, fn, flight) {
   var body = box.querySelector('.flight-box-body');
   if (body) {
-    body.innerHTML = renderFlightDataSimple(flight);
+    body.innerHTML = passBlockHTML(fn) + renderFlightDataSimple(flight);
   }
   // Auto-open after refresh
   box.classList.add('open');
@@ -1545,13 +1901,15 @@ function fileTimestamp(){
 }
 
 function backupTrips(){
-  var data=JSON.stringify({trips:trips,settings:settings,exportedAt:new Date().toISOString()},null,2);
+  packPassFiles().then(function(pf){
+  var data=JSON.stringify({trips:trips,settings:settings,passFiles:pf,exportedAt:new Date().toISOString()},null,2);
   var a=document.createElement('a');
   a.href=URL.createObjectURL(new Blob([data],{type:'application/json'}));
   var d=new Date();
   a.download='VoyagerApp_'+fileTimestamp()+'.json';
   a.click();
   toast('Backup downloaded!');
+  });
 }
 
 function importTrips(){
@@ -1577,6 +1935,7 @@ function handleImportFile(file){
           if(t&&t.id&&!existingIds[t.id]){trips.push(t);added++;}
         });
         if(data.settings&&data.settings.sec){settings=data.settings;}
+        if(data.passFiles)unpackPassFiles(data.passFiles);
         save();renderHome();
         toast(added+' trip'+(added!==1?'s':'')+' imported!');
       }catch(err){
@@ -2100,7 +2459,7 @@ document.addEventListener('click',function(e){
     }
     if(a==='detail'){goDetail(el.dataset.id);return;}
     if(a==='edit'){openTripForm(el.dataset.id);return;}
-    if(a==='del'){if(confirm('Delete this trip? This cannot be undone.')){trips=trips.filter(function(t){return t.id!==el.dataset.id;});save();renderHome();toast('Deleted');}return;}
+    if(a==='del'){if(confirm('Delete this trip? This cannot be undone.')){var dt=getTrip(el.dataset.id);if(dt)(dt.passes||[]).forEach(function(p){idbDel(p.id);});trips=trips.filter(function(t){return t.id!==el.dataset.id;});save();renderHome();toast('Deleted');}return;}
     if(a==='go-home'){goHome();return;}
     if(a==='export'){exportCSV(curTripId);return;}
     if(a==='bank-upload'){openBankUpload(curTripId);return;}
@@ -2133,6 +2492,14 @@ document.addEventListener('click',function(e){
       if(_reviewIdx>0){_reviewIdx--;renderReviewItem();}
       return;
     }
+    if(a==='add-pass'){addPasses();return;}
+    if(a==='show-pass'){showPasses(el.dataset.fn,el.dataset.pid);return;}
+    if(eid==='B_PASS_SAVE'){savePasses();return;}
+    if(eid==='B_PASS_CANCEL'){closeOvl('OVL_PASS');_passQueue=[];return;}
+    if(eid==='PV_CLOSE'){closePassView();return;}
+    if(eid==='PV_PREV'){if(_pv.i>0){_pv.i--;renderPassView();}return;}
+    if(eid==='PV_NEXT'){if(_pv.i<_pv.list.length-1){_pv.i++;renderPassView();}return;}
+    if(eid==='PV_DEL'){deleteCurrentPass();return;}
     if(a==='refresh-flight'){
       // Stop propagation so the expand/collapse doesn't fire
       e.stopPropagation();
@@ -2186,6 +2553,7 @@ document.addEventListener('click',function(e){
 document.getElementById('F_SECCUR').addEventListener('change',function(){updateRateFields(this.value);});
 document.getElementById('F_PRIMCUR').addEventListener('change',function(){updateRateFields(document.getElementById('F_SECCUR').value);});
 document.getElementById('F_GTYPE').addEventListener('change',toggleGenDates);
+document.getElementById('F_PASS_FILE').addEventListener('change',function(){handlePassFiles(this.files);});
 document.getElementById('F_IMPORT_FILE').addEventListener('change',function(){
   handleImportFile(this.files[0]);
   this.value='';
