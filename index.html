@@ -157,6 +157,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--fb);min-height:100
 .cat-bar-bg{height:5px;border-radius:3px;background:var(--surf2);overflow:hidden}
 .cat-bar-fill{height:100%;border-radius:3px}
 .rate-note{background:rgba(45,212,160,0.08);border:1px solid rgba(45,212,160,0.2);border-radius:10px;padding:10px 12px;font-size:12px;color:var(--green);margin-bottom:12px}
+.clip-btn{font-size:14px;background:rgba(240,165,0,0.12);border:1px solid rgba(240,165,0,0.35);border-radius:6px;padding:2px 6px;color:var(--accent)}
 .pass-block{margin:12px 0 4px;display:flex;flex-direction:column;gap:6px}
 .pass-row{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;background:rgba(240,165,0,0.08);border:1px solid rgba(240,165,0,0.3);cursor:pointer;user-select:none}
 .pass-row:active{background:rgba(240,165,0,0.16)}
@@ -298,7 +299,7 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(.5)}
     <div class="handle"></div>
     <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:18px">
       <h2 style="margin-bottom:0">Settings</h2>
-      <span style="font-size:11px;color:var(--muted);font-family:var(--fb)">v1.18</span>
+      <span style="font-size:11px;color:var(--muted);font-family:var(--fb)">v1.19</span>
     </div>
     <div class="field"><label>Primary Currency (your home currency)</label>
       <select id="F_PRIMCUR"></select>
@@ -432,6 +433,19 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(.5)}
     <button class="pv-btn" id="PV_NEXT">Next ›</button>
   </div>
 </div>
+<div class="overlay" id="OVL_VOUCHER">
+  <div class="sheet">
+    <div class="handle"></div>
+    <h2 id="VOUCHER_TITLE">Vouchers</h2>
+    <div id="VOUCHER_REVIEW"></div>
+    <div style="font-size:11px;color:var(--muted);margin:4px 0 12px">Files stay on this phone only.</div>
+    <div class="btn2">
+      <button class="cancel" id="B_VOUCHER_CANCEL">Cancel</button>
+      <button class="ok" id="B_VOUCHER_SAVE">Save</button>
+    </div>
+  </div>
+</div>
+<input type="file" id="F_VOUCHER_FILE" accept="application/pdf,image/*,.pdf" multiple style="display:none">
 <input type="file" id="F_PASS_FILE" accept="application/pdf,image/*,.pdf" multiple style="display:none">
 <div class="overlay" id="OVL_NOTES">
   <div class="sheet">
@@ -970,7 +984,7 @@ function passBlockHTML(fn){
 var _pv={list:[],i:0,urls:[],lock:null};
 function showPasses(fn,pid){
   var ps=passesFor(getTrip(curTripId),fn);if(!ps.length)return;
-  _pv.list=ps;_pv.i=Math.max(0,ps.findIndex(function(p){return p.id===pid;}));
+  _pv.list=ps;_pv.onDelete=null;_pv.i=Math.max(0,ps.findIndex(function(p){return p.id===pid;}));
   document.getElementById('PASS_VIEW').classList.add('on');
   try{if(navigator.wakeLock)navigator.wakeLock.request('screen').then(function(l){_pv.lock=l;}).catch(function(){});}catch(e){}
   renderPassView();
@@ -983,8 +997,8 @@ function closePassView(){
 function renderPassView(){
   var p=_pv.list[_pv.i];if(!p)return closePassView();
   _pv.urls.forEach(function(u){URL.revokeObjectURL(u);});_pv.urls=[];
-  document.getElementById('PV_TITLE').textContent=(p.name||'Passenger');
-  document.getElementById('PV_SUB').textContent=[p.fn,(p.from&&p.to)?p.from+' → '+p.to:'',p.seat?'Seat '+p.seat:'',p.gate?'Gate '+p.gate:''].filter(Boolean).join(' · ');
+  document.getElementById('PV_TITLE').textContent=p.title||p.name||'Passenger';
+  document.getElementById('PV_SUB').textContent=p.title!==undefined?(p.sub||''):[p.fn,(p.from&&p.to)?p.from+' → '+p.to:'',p.seat?'Seat '+p.seat:'',p.gate?'Gate '+p.gate:''].filter(Boolean).join(' · ');
   document.getElementById('PV_COUNT').textContent=_pv.list.length>1?(_pv.i+1)+' / '+_pv.list.length:'';
   document.getElementById('PV_PREV').style.visibility=_pv.i>0?'visible':'hidden';
   document.getElementById('PV_NEXT').style.visibility=_pv.i<_pv.list.length-1?'visible':'hidden';
@@ -1002,8 +1016,9 @@ function renderPassView(){
 }
 function deleteCurrentPass(){
   var p=_pv.list[_pv.i],t=getTrip(curTripId);if(!p||!t)return;
-  if(!confirm('Delete this boarding pass?'))return;
-  t.passes=(t.passes||[]).filter(function(x){return x.id!==p.id;});idbDel(p.id);save();
+  if(!confirm(_pv.onDelete?'Delete this voucher file?':'Delete this boarding pass?'))return;
+  if(_pv.onDelete)_pv.onDelete(p);
+  else{t.passes=(t.passes||[]).filter(function(x){return x.id!==p.id;});idbDel(p.id);save();}
   _pv.list.splice(_pv.i,1);if(_pv.i>=_pv.list.length)_pv.i=_pv.list.length-1;
   renderFlightBoxes();
   if(!_pv.list.length)closePassView();else renderPassView();
@@ -1014,7 +1029,7 @@ function blobToDataURL(b){return new Promise(function(res){var r=new FileReader(
 function dataURLToBlob(u){var a=u.split(','),mime=(a[0].match(/:(.*?);/)||[])[1]||'application/octet-stream',bin=atob(a[1]),arr=new Uint8Array(bin.length);for(var i=0;i<bin.length;i++)arr[i]=bin.charCodeAt(i);return new Blob([arr],{type:mime});}
 function packPassFiles(){
   var out={},jobs=[];
-  trips.forEach(function(t){(t.passes||[]).forEach(function(p){
+  trips.forEach(function(t){(t.passes||[]).concat([].concat.apply([],(t.gen||[]).map(function(g){return g.vouchers||[];}))).forEach(function(p){
     jobs.push(idbGet(p.id).then(function(rec){if(!rec)return;
       return blobToDataURL(rec.orig).then(function(o){return Promise.all((rec.pages||[]).map(blobToDataURL)).then(function(pg){out[p.id]={orig:o,pages:pg};});});
     }).catch(function(){}));
@@ -1026,6 +1041,220 @@ function unpackPassFiles(obj){
   return Promise.all(Object.keys(obj).map(function(id){var r=obj[id];
     return idbPut(id,{orig:dataURLToBlob(r.orig),pages:(r.pages||[]).map(dataURLToBlob)});})).catch(function(){});
 }
+
+// ══════════════════════ HOTEL & CAR VOUCHERS ══════════════════════
+// Files stay on this device (same IndexedDB store as boarding passes). Details go into the matching expense.
+var VOUCHER_TYPES={hotel:{icon:'🏨',noun:'hotel',nameLbl:'Hotel name',fromLbl:'Check-in',toLbl:'Check-out'},
+                   car:{icon:'🚗',noun:'car',nameLbl:'Rental company / car',fromLbl:'Pick-up',toLbl:'Drop-off'}};
+var CAR_BRANDS=['Sixt','Hertz','Avis','Europcar','Budget','Enterprise','Alamo','Thrifty','Dollar','National','Goldcar','Firefly','Keddy','Green Motion','Centauro','Record Go','OK Mobility','Drivalia','Maggiore','Locauto','Sicily by Car','Rentalcars','Discover Cars','Eldan','Shlomo','Albar','Cal Auto','Avis Budget','Payless','Fox','Ace','Surprice','Interrent','Hiper','Autoeurope','Auto Europe','Economy Bookings','Zoom','Turo'];
+var MONTHS_LONG=['january','february','march','april','may','june','july','august','september','october','november','december'];
+
+// "12 Oct 2026", "Oct 12, 2026", "Mon 12 October 2026", "12/10/2026" (day first), "2026-10-12" -> ISO
+function findDates(text){
+  var out=[],re=/(\d{4})-(\d{1,2})-(\d{1,2})|(\d{1,2})[\/.](\d{1,2})[\/.](\d{2,4})|(\d{1,2})(?:st|nd|rd|th)?\s+([A-Za-z]{3,9})\.?,?\s+(\d{4})|([A-Za-z]{3,9})\.?\s+(\d{1,2})(?:st|nd|rd|th)?,?\s+(\d{4})/g,m;
+  function mon(s){s=s.toLowerCase();for(var i=0;i<12;i++){if(MONTHS_LONG[i].indexOf(s)===0&&s.length>=3)return i+1;}return 0;}
+  function pad(n){return ('0'+n).slice(-2);}
+  while((m=re.exec(text))){
+    var y,mo,d;
+    if(m[1]){y=+m[1];mo=+m[2];d=+m[3];}
+    else if(m[4]){d=+m[4];mo=+m[5];y=+m[6];if(y<100)y+=2000;}
+    else if(m[7]){d=+m[7];mo=mon(m[8]);y=+m[9];}
+    else {mo=mon(m[10]);d=+m[11];y=+m[12];}
+    if(mo>=1&&mo<=12&&d>=1&&d<=31&&y>2000&&y<2100)out.push({iso:y+'-'+pad(mo)+'-'+pad(d),at:m.index});
+  }
+  return out;
+}
+function textLines(items){
+  var rows=[];
+  items.slice().sort(function(a,b){return a.y-b.y||a.x-b.x;}).forEach(function(it){
+    var r=rows.length?rows[rows.length-1]:null;
+    if(r&&Math.abs(r.y-it.y)<4)r.parts.push(it);else rows.push({y:it.y,parts:[it]});
+  });
+  return rows.map(function(r){return r.parts.sort(function(a,b){return a.x-b.x;}).map(function(p){return p.s;}).join(' ').replace(/\s+/g,' ').trim();}).filter(Boolean);
+}
+// value after a label on the same line ("Check-in: 12 Oct") or on the next line
+function afterLabel(lines,re){
+  for(var i=0;i<lines.length;i++){
+    var m=lines[i].match(re);if(!m)continue;
+    var rest=lines[i].slice(m.index+m[0].length).replace(/^[\s:：\-–#]+/,'').trim();
+    if(rest)return {v:rest,i:i};
+    if(lines[i+1])return {v:lines[i+1],i:i+1};
+  }
+  return null;
+}
+function parseMoney(lines){
+  var sym={'€':'EUR','$':'USD','£':'GBP','₪':'ILS'},best=null;
+  lines.forEach(function(l){
+    if(!/(total|amount|price|to pay|paid|סה"כ|סכום|מחיר)/i.test(l))return;
+    var m=l.match(/(€|\$|£|₪|EUR|USD|GBP|ILS|CHF|THB|AED|JPY)\s?([\d][\d.,\s]*\d|\d)|([\d][\d.,\s]*\d|\d)\s?(€|\$|£|₪|EUR|USD|GBP|ILS|CHF|THB|AED|JPY)/i);
+    if(!m)return;
+    var cur=(m[1]||m[4]).toUpperCase(),num=(m[2]||m[3]).replace(/\s/g,'');
+    if(/,\d{2}$/.test(num))num=num.replace(/\./g,'').replace(',','.');else num=num.replace(/,/g,'');
+    var v=parseFloat(num);if(!(v>0))return;
+    var score=/total/i.test(l)?2:1;
+    if(!best||score>best.s||(score===best.s&&v>best.amt))best={amt:v,cur:sym[cur]||cur,s:score};
+  });
+  return best;
+}
+// text sitting under a label in the same column (tables with "Check-in | Check-out" side by side)
+function pickDate(items,lines,re){
+  var d=findDates(underLabel(items,re));if(d.length)return d[0].iso;
+  var a=afterLabel(lines,re);if(!a)return '';
+  d=findDates(a.v);if(d.length)return d[0].iso;
+  d=findDates(lines[a.i+1]||'');return d.length?d[0].iso:'';
+}
+function underLabel(items,re){
+  var L=items.filter(function(it){return it.s.length<30&&re.test(it.s);})[0];
+  if(!L)return '';
+  return items.filter(function(it){return it!==L&&it.y>L.y+3&&it.y<L.y+70&&Math.abs(it.x-L.x)<40;})
+    .sort(function(a,b){return a.y-b.y;}).map(function(it){return it.s;}).join(' ');
+}
+function parseVoucherText(items,type){
+  var lines=textLines(items),all=lines.join('\n'),m={};
+  var conf=all.match(/(confirmation|booking|reservation|voucher|itinerary)\s*(number|no\.?|#|code|id|reference|ref\.?)?\s*[:#]?\s*([A-Z0-9][A-Z0-9.\-]{4,}[A-Z0-9])/i);
+  if(conf&&/\d/.test(conf[3]))m.conf=conf[3];
+  var money=parseMoney(lines);if(money){m.amt=money.amt;m.cur=money.cur;}
+  if(type==='hotel'){
+    var n=afterLabel(lines,/^(hotel name|property name|hotel|property|accommodation|שם המלון|מלון)\s*([:：]|$)/i);
+    if(n&&n.v.length<70&&!/check|date|\d{2}:\d{2}/i.test(n.v))m.name=n.v;
+    if(!m.name){
+      var h=lines.filter(function(l){return l.length<60&&/\b(hotel|resort|inn|suites?|apartments?|hostel|lodge|villa|guest ?house|b&b|residence|palace|motel|aparthotel)\b/i.test(l)&&!/(confirm|booking\.com|thank|policy|check|reservation|cancel)/i.test(l);});
+      if(h.length)m.name=h[0];
+    }
+    var reIn=/(check[\s\-]?in|arrival|צ'ק[\s\-]?אין|הגעה)/i,reOut=/(check[\s\-]?out|departure|צ'ק[\s\-]?אאוט|עזיבה)/i;
+    m.from=pickDate(items,lines,reIn);m.to=pickDate(items,lines,reOut);
+  } else {
+    var brand='';CAR_BRANDS.some(function(b){if(new RegExp('\\b'+b.replace(/ /g,'\\s')+'\\b','i').test(all)){brand=b;return true;}return false;});
+    var sup=afterLabel(lines,/^(supplier|rental company|car rental company|provided by|company|ספק|חברת השכרה)\s*([:：]|$)/i);
+    if(sup&&sup.v.length<40)brand=sup.v;
+    var car=lines.filter(function(l){return /or similar|או דומה/i.test(l)&&l.length<70;})[0];
+    m.name=[brand,car?car.replace(/\s*(or similar|או דומה).*/i,'').trim():''].filter(Boolean).join(' · ');
+    m.from=pickDate(items,lines,/(pick[\s\-]?up|collection|איסוף)/i);m.to=pickDate(items,lines,/(drop[\s\-]?off|return|החזרה)/i);
+  }
+  if(!m.from||!m.to){var ds=findDates(all);if(!m.from&&ds[0])m.from=ds[0].iso;if(!m.to&&ds.length>1)m.to=ds.filter(function(d){return d.iso>(m.from||'');})[0]?ds.filter(function(d){return d.iso>(m.from||'');})[0].iso:'';}
+  if(m.from&&m.to&&m.to<m.from){var x=m.from;m.from=m.to;m.to=x;}
+  return m;
+}
+function readPdfFile(file){
+  return loadPdfJs().then(function(pdfjs){return file.arrayBuffer().then(function(buf){return pdfjs.getDocument({data:buf}).promise;});})
+  .then(function(doc){
+    var n=Math.min(doc.numPages,6),chain=Promise.resolve(),items=[],pages=[],yOff=0;
+    for(var i=1;i<=n;i++)(function(i){chain=chain.then(function(){return doc.getPage(i).then(function(page){
+      var vp1=page.getViewport({scale:1}),vp=page.getViewport({scale:2});
+      var c=document.createElement('canvas');c.width=vp.width;c.height=vp.height;
+      var ctx=c.getContext('2d');ctx.fillStyle='#fff';ctx.fillRect(0,0,c.width,c.height);
+      return page.render({canvasContext:ctx,viewport:vp}).promise.then(function(){return page.getTextContent();}).then(function(tc){
+        tc.items.forEach(function(it){if(!it.str||!it.str.trim())return;
+          var pt=vp1.convertToViewportPoint(it.transform[4],it.transform[5]);items.push({s:it.str.trim(),x:pt[0],y:pt[1]+yOff});});
+        yOff+=vp1.height+100;
+        return canvasToBlob(c,'image/jpeg',0.88).then(function(b){pages.push(b);});
+      });
+    });});})(i);
+    return chain.then(function(){return {items:items,pages:pages};});
+  });
+}
+function processVoucherFile(file,type){
+  var isPdf=/pdf/i.test(file.type)||/\.pdf$/i.test(file.name);
+  var work=isPdf?readPdfFile(file):Promise.resolve({items:[],pages:[]});
+  return work.then(function(r){
+    var meta=parseVoucherText(r.items,type);
+    meta.found=!!(meta.name||meta.from);
+    return {file:file,pages:r.pages,meta:meta,type:type};
+  });
+}
+
+// pick the expense this voucher belongs to (same dates / name), or -1 for a new one
+function guessVoucherTarget(t,type,m){
+  var best=-1,bs=0,used={};
+  (t.gen||[]).forEach(function(e,i){
+    if(e.type!==type)return;
+    var s=0,desc=(e.desc||'').toLowerCase();
+    if(m.from&&e.dateFrom===m.from)s+=3;
+    else if(m.from&&e.dateFrom&&e.dateTo&&m.from>=e.dateFrom&&m.from<e.dateTo)s+=2;
+    if(m.name&&desc&&(desc.indexOf(m.name.toLowerCase().split(' · ')[0])>=0))s+=3;
+    if(!(e.vouchers&&e.vouchers.length))s+=1;
+    if(s>bs){bs=s;best=i;}
+  });
+  var same=(t.gen||[]).filter(function(e){return e.type===type;});
+  if(bs<2&&!(same.length===1&&!(same[0].vouchers||[]).length))return -1;
+  return best;
+}
+
+var _vQueue=[],_vType='hotel';
+function addVouchers(type){_vType=type;var f=document.getElementById('F_VOUCHER_FILE');f.value='';f.click();}
+function handleVoucherFiles(files){
+  var t=getTrip(curTripId);if(!t||!files||!files.length)return;
+  var VT=VOUCHER_TYPES[_vType];
+  _vQueue=[];
+  document.getElementById('VOUCHER_TITLE').textContent=VT.icon+' '+(_vType==='hotel'?'Hotel vouchers':'Car rental vouchers');
+  document.getElementById('VOUCHER_REVIEW').innerHTML='<div class="pass-busy">⏳ Reading '+files.length+' file'+(files.length>1?'s':'')+'…</div>';
+  closeOvl('OVL_GEN_LIST');openOvl('OVL_VOUCHER');
+  var chain=Promise.resolve();
+  Array.prototype.forEach.call(files,function(f){
+    chain=chain.then(function(){return processVoucherFile(f,_vType).catch(function(err){return {file:f,pages:[],meta:{found:false},type:_vType,error:err.message};});})
+      .then(function(r){r.target=guessVoucherTarget(t,_vType,r.meta);_vQueue.push(r);});
+  });
+  chain.then(renderVoucherReview);
+}
+function renderVoucherReview(){
+  var t=getTrip(curTripId),VT=VOUCHER_TYPES[_vType],html='';
+  var opts=(t.gen||[]).map(function(e,i){return {e:e,i:i};}).filter(function(x){return x.e.type===_vType;});
+  _vQueue.forEach(function(r,qi){
+    var m=r.meta||{};
+    html+='<div class="pass-card"><div class="pass-file">📄 '+esc(r.file.name)+'</div>';
+    if(r.error)html+='<div class="pass-warn">⚠️ '+esc(r.error)+'</div>';
+    else if(!m.found)html+='<div class="pass-warn">Couldn\'t read the details automatically'+(/pdf/i.test(r.file.type)?'':' (images can\'t be read)')+'. Please fill them in.</div>';
+    html+='<div class="field"><label>'+VT.nameLbl+'</label><input data-vq="'+qi+'" data-k="name" value="'+esc(m.name)+'" placeholder="'+(_vType==='hotel'?'e.g. Hotel Avenida Palace':'e.g. Sixt · VW Golf')+'"></div>';
+    html+='<div class="frow"><div class="field"><label>'+VT.fromLbl+'</label><input type="date" data-vq="'+qi+'" data-k="from" value="'+esc(m.from)+'"></div>';
+    html+='<div class="field"><label>'+VT.toLbl+'</label><input type="date" data-vq="'+qi+'" data-k="to" value="'+esc(m.to)+'"></div></div>';
+    html+='<div class="frow"><div class="field"><label>Confirmation #</label><input data-vq="'+qi+'" data-k="conf" value="'+esc(m.conf)+'"></div>';
+    html+='<div class="field"><label>Price'+(m.cur?' ('+esc(m.cur)+')':'')+'</label><input type="number" step="any" data-vq="'+qi+'" data-k="amt" value="'+(m.amt||'')+'" placeholder="optional"></div></div>';
+    html+='<div class="field"><label>Attach to</label><select data-vq="'+qi+'" data-k="target">';
+    opts.forEach(function(x){var e=x.e;html+='<option value="'+x.i+'"'+(r.target===x.i?' selected':'')+'>'+esc((e.desc||VT.noun)+(e.dateFrom?' · '+fdate(e.dateFrom):'')+' · '+fmt(e.amt||0,e.cur||t.cur||'USD'))+'</option>';});
+    html+='<option value="-1"'+(r.target===-1?' selected':'')+'>➕ New '+VT.noun+' expense</option></select></div>';
+    html+='</div>';
+  });
+  document.getElementById('VOUCHER_REVIEW').innerHTML=html;
+}
+function saveVouchers(){
+  var t=getTrip(curTripId);if(!t)return;
+  document.querySelectorAll('#VOUCHER_REVIEW [data-vq]').forEach(function(inp){
+    var r=_vQueue[+inp.dataset.vq];if(!r)return;
+    var k=inp.dataset.k,v=inp.value.trim();
+    if(k==='target')r.target=parseInt(v,10);else if(k==='amt')r.meta.amt=parseFloat(v)||0;else r.meta[k]=v;
+  });
+  if(!t.gen)t.gen=[];
+  var jobs=_vQueue.map(function(r,qi){
+    var id='vc'+Date.now()+'_'+qi,m=r.meta;
+    var vmeta={id:id,name:m.name||'',conf:m.conf||'',from:m.from||'',to:m.to||'',fileName:r.file.name,fileType:r.file.type||''};
+    return idbPut(id,{orig:r.file,pages:r.pages}).then(function(){
+      var e=r.target>=0?t.gen[r.target]:null;
+      if(!e){
+        e={type:r.type,desc:m.name||VOUCHER_TYPES[r.type].noun,amt:m.amt||0,cur:(m.cur&&CURRENCIES.some(function(c){return c.v===m.cur;}))?m.cur:(t.cur||'USD')};
+        if(m.from)e.dateFrom=m.from;if(m.to)e.dateTo=m.to;
+        t.gen.push(e);
+      } else {
+        if(m.name){var d=(e.desc||'').trim();if(!d||d.toLowerCase()===r.type||d.toLowerCase()===VOUCHER_TYPES[r.type].noun)e.desc=m.name;else if(d.toLowerCase().indexOf(m.name.toLowerCase())<0)e.desc=m.name+' · '+d;}
+        if(m.from&&!e.dateFrom)e.dateFrom=m.from;if(m.to&&!e.dateTo)e.dateTo=m.to;
+        if(!(e.amt>0)&&m.amt)e.amt=m.amt;
+      }
+      if(!e.vouchers)e.vouchers=[];e.vouchers.push(vmeta);
+    });
+  });
+  Promise.all(jobs).then(function(){
+    save();closeOvl('OVL_VOUCHER');_vQueue=[];renderDetail();
+    toast('📎 Voucher'+(jobs.length>1?'s':'')+' saved');
+  }).catch(function(e){toast('Could not save file: '+e.message);});
+}
+function showVouchers(idx){
+  var t=getTrip(curTripId),e=t&&t.gen[idx];if(!e||!(e.vouchers||[]).length)return;
+  _pv.list=e.vouchers.map(function(v){return {id:v.id,fileName:v.fileName,fileType:v.fileType,
+    title:v.name||e.desc||'Voucher',sub:[v.conf?'Conf. '+v.conf:'',v.from?fdate(v.from)+(v.to?' → '+fdate(v.to):''):''].filter(Boolean).join(' · ')};});
+  _pv.i=0;_pv.onDelete=function(p){e.vouchers=e.vouchers.filter(function(v){return v.id!==p.id;});idbDel(p.id);save();renderDetail();};
+  document.getElementById('PASS_VIEW').classList.add('on');
+  renderPassView();
+}
+function voucherIds(e){return (e&&e.vouchers||[]).map(function(v){return v.id;});}
 
 // ══════════════════════ FLIGHT STATUS ══════════════════════
 var RAPIDAPI_KEY = '23eb400c35msh06f50139eaa50b5p11e6b4jsneb0dba866e16'; // AeroDataBox via RapidAPI: supports future dates
@@ -1446,6 +1675,7 @@ function renderDetail(){
       var eOriginal=(eCur!==cur)?('<div class="as">'+fmt(e.amt,eCur)+'</div>'):'';
       var eSec=secAmt(eConverted,cur);
       tabG+='<div class="exp-a"><div class="am">'+fmt(eConverted,cur)+'</div>'+eOriginal+(eSec?'<div class="as">'+eSec+'</div>':'')+'</div>';
+      if((e.vouchers||[]).length)tabG+='<button class="xbtn clip-btn" data-action="show-vouchers" data-idx="'+i+'">📎'+(e.vouchers.length>1?e.vouchers.length:'')+'</button>';
       tabG+='<button class="xbtn" data-action="edit-gen" data-idx="'+i+'" style="color:var(--muted);font-size:15px">✏️</button>';
       tabG+='<button class="xbtn" data-action="del-gen" data-idx="'+i+'">×</button></div>';
     });
@@ -1693,6 +1923,7 @@ function renderGenList(type){
   });
 
   var html='';
+  if(VOUCHER_TYPES[type])html+='<button class="add-pass-btn" data-action="add-voucher" data-type="'+type+'">📎 Add '+(type==='hotel'?'hotel':'car rental')+' voucher</button>';
 
   // General items section
   html+='<div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;padding:8px 2px 4px">General Expenses</div>';
@@ -1710,6 +1941,7 @@ function renderGenList(type){
       html+='<div class="exp-i"><div class="exp-d">'+(e.desc||e.type||'-')+'</div>';
       html+='<div class="exp-c">'+(dl||eCur)+'</div></div>';
       html+='<div class="exp-a"><div class="am">'+fmt(eConv,cur)+'</div>'+eOrig+'</div>';
+      if((e.vouchers||[]).length)html+='<button class="xbtn clip-btn" data-action="show-vouchers" data-idx="'+i+'">📎'+(e.vouchers.length>1?e.vouchers.length:'')+'</button>';
       html+='<button class="xbtn" data-action="gen-list-edit" data-idx="'+i+'" style="font-size:12px;color:var(--accent);background:var(--surf2);border:1px solid var(--border);border-radius:6px;padding:3px 7px">Edit</button>';
       html+='<button class="xbtn" data-action="gen-list-del" data-idx="'+i+'" data-type="'+e.type+'">×</button>';
       html+='</div>';
@@ -1785,6 +2017,7 @@ function saveGen(){
   if(dateFrom)entry.dateFrom=dateFrom;
   if(dateTo)entry.dateTo=dateTo;
   if(editGenIdx>=0){
+    if(t.gen[editGenIdx]&&t.gen[editGenIdx].vouchers)entry.vouchers=t.gen[editGenIdx].vouchers;
     t.gen[editGenIdx]=entry;
     toast('Updated!');
   } else {
@@ -1793,7 +2026,7 @@ function saveGen(){
   }
   save();closeOvl('OVL_GEN');renderDetail();
 }
-function delGen(i){if(!confirm('Delete this expense?'))return;var t=getTrip(curTripId);t.gen.splice(i,1);save();renderDetail();toast('Deleted');}
+function delGen(i){if(!confirm('Delete this expense?'))return;var t=getTrip(curTripId);voucherIds(t.gen[i]).forEach(idbDel);t.gen.splice(i,1);save();renderDetail();toast('Deleted');}
 
 function openExpForm(date,idx,editIdx){
   curDay=date;
@@ -2399,6 +2632,7 @@ document.addEventListener('click',function(e){
     if(a==='gen-list-del'){
       if(!confirm('Delete this expense?'))return;
       var t3=getTrip(curTripId);
+      voucherIds(t3.gen[parseInt(el.dataset.idx)]).forEach(idbDel);
       t3.gen.splice(parseInt(el.dataset.idx),1);
       save();renderDetail();
       renderGenList(document.getElementById('B_GEN_LIST_ADD').dataset.type);
@@ -2479,7 +2713,7 @@ document.addEventListener('click',function(e){
     }
     if(a==='detail'){goDetail(el.dataset.id);return;}
     if(a==='edit'){openTripForm(el.dataset.id);return;}
-    if(a==='del'){if(confirm('Delete this trip? This cannot be undone.')){var dt=getTrip(el.dataset.id);if(dt)(dt.passes||[]).forEach(function(p){idbDel(p.id);});trips=trips.filter(function(t){return t.id!==el.dataset.id;});save();renderHome();toast('Deleted');}return;}
+    if(a==='del'){if(confirm('Delete this trip? This cannot be undone.')){var dt=getTrip(el.dataset.id);if(dt){(dt.passes||[]).forEach(function(p){idbDel(p.id);});(dt.gen||[]).forEach(function(g){voucherIds(g).forEach(idbDel);});}trips=trips.filter(function(t){return t.id!==el.dataset.id;});save();renderHome();toast('Deleted');}return;}
     if(a==='go-home'){goHome();return;}
     if(a==='export'){exportCSV(curTripId);return;}
     if(a==='bank-upload'){openBankUpload(curTripId);return;}
@@ -2513,6 +2747,10 @@ document.addEventListener('click',function(e){
       return;
     }
     if(a==='add-pass'){addPasses();return;}
+    if(a==='add-voucher'){addVouchers(el.dataset.type);return;}
+    if(a==='show-vouchers'){showVouchers(parseInt(el.dataset.idx,10));return;}
+    if(eid==='B_VOUCHER_SAVE'){saveVouchers();return;}
+    if(eid==='B_VOUCHER_CANCEL'){closeOvl('OVL_VOUCHER');_vQueue=[];return;}
     if(a==='show-pass'){showPasses(el.dataset.fn,el.dataset.pid);return;}
     if(eid==='B_PASS_SAVE'){savePasses();return;}
     if(eid==='B_PASS_CANCEL'){closeOvl('OVL_PASS');_passQueue=[];return;}
@@ -2574,6 +2812,7 @@ document.getElementById('F_SECCUR').addEventListener('change',function(){updateR
 document.getElementById('F_PRIMCUR').addEventListener('change',function(){updateRateFields(document.getElementById('F_SECCUR').value);});
 document.getElementById('F_GTYPE').addEventListener('change',toggleGenDates);
 document.getElementById('F_PASS_FILE').addEventListener('change',function(){handlePassFiles(this.files);});
+document.getElementById('F_VOUCHER_FILE').addEventListener('change',function(){handleVoucherFiles(this.files);});
 document.getElementById('F_IMPORT_FILE').addEventListener('change',function(){
   handleImportFile(this.files[0]);
   this.value='';
