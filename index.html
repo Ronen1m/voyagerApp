@@ -298,7 +298,7 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(.5)}
     <div class="handle"></div>
     <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:18px">
       <h2 style="margin-bottom:0">Settings</h2>
-      <span style="font-size:11px;color:var(--muted);font-family:var(--fb)">v1.17</span>
+      <span style="font-size:11px;color:var(--muted);font-family:var(--fb)">v1.18</span>
     </div>
     <div class="field"><label>Primary Currency (your home currency)</label>
       <select id="F_PRIMCUR"></select>
@@ -506,12 +506,26 @@ var trips=[],settings={prim:'ILS',sec:'',rates:{}};var sortAsc=false;
 var curTripId=null,editTripId=null,curDay=null,editGenIdx=-1,editExpIdx=-1,pickImage=null;
 var pickEmoji=EMOJIS[0],pickColor=DEF_COLOR;
 
+// Any date text -> "YYYY-MM-DD" ('' if unknown). Day comes before month (Israeli format).
+function isoDate(v){
+  if(!v)return '';
+  var s=String(v).trim(),m;
+  if((m=s.match(/^(\d{4})[-\/.](\d{1,2})[-\/.](\d{1,2})/)))return m[1]+'-'+('0'+m[2]).slice(-2)+'-'+('0'+m[3]).slice(-2);
+  if((m=s.match(/^(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{2,4})$/))){var y=m[3].length===2?'20'+m[3]:m[3];return y+'-'+('0'+m[2]).slice(-2)+'-'+('0'+m[1]).slice(-2);}
+  var d=new Date(s);
+  return isNaN(d)?'':toDateStr(d);
+}
 function load(){
   try{
     var d=sGet('voy3');
     if(d){
       var p=JSON.parse(d);
       trips=p.trips||[];
+      trips.forEach(function(t){
+        var a=isoDate(t.start),b=isoDate(t.end);
+        if(a&&a!==t.start)t.start=a; if(b&&b!==t.end)t.end=b;
+      });
+      sortAsc=sGet('voy_sort_asc')==='1';
       settings=p.settings||{prim:'ILS',sec:'',rates:{}};
       if(!settings.rates)settings.rates={};
       if(!settings.prim)settings.prim='ILS';
@@ -626,7 +640,13 @@ function renderHome(){
     el.innerHTML='<div class="empty"><div class="ei">🗺️</div><p>No trips yet.<br>Tap <strong>+ New Trip</strong> to start!</p></div>';
     return;
   }
-  var sorted=trips.slice().sort(function(a,b){var da=a.start||'',db=b.start||'';if(sortAsc)return da>db?1:(da<db?-1:0);return db>da?1:(db<da?-1:0);});
+  // By departure date (newest first by default); trips without a date always go last
+  var sorted=trips.slice().sort(function(a,b){
+    var da=isoDate(a.start),db=isoDate(b.start);
+    if(!da&&!db)return 0; if(!da)return 1; if(!db)return -1;
+    if(da===db){da=isoDate(a.end)||da;db=isoDate(b.end)||db;}
+    return sortAsc?(da>db?1:da<db?-1:0):(db>da?1:db<da?-1:0);
+  });
   var html=countdownHTML();
   sorted.forEach(function(t){
     var cur=t.cur||'USD',nd=getDays(t).length;
@@ -2428,7 +2448,7 @@ document.addEventListener('click',function(e){
       document.getElementById('RF_CUSTOM_RATE').value='';
       return;
     }
-    if(eid==='B_SORT'){sortAsc=!sortAsc;document.getElementById('B_SORT').innerHTML=sortAsc?'<span class="ticon">🔼</span>Oldest':'<span class="ticon">🔽</span>Newest';renderHome();return;}
+    if(eid==='B_SORT'){sortAsc=!sortAsc;sSet('voy_sort_asc',sortAsc?'1':'0');document.getElementById('B_SORT').innerHTML=sortAsc?'<span class="ticon">🔼</span>Oldest':'<span class="ticon">🔽</span>Newest';renderHome();return;}
     if(eid==='B_TRIP_CANCEL'){closeOvl('OVL_TRIP');return;}
     if(eid==='B_UPLOAD_ICON'){document.getElementById('F_ICON_IMAGE').click();return;}
     if(eid==='B_CLEAR_ICON'){pickImage=null;document.getElementById('F_ICON_IMAGE').value='';updatePreview();return;}
@@ -2589,6 +2609,7 @@ document.getElementById('F_ICON_IMAGE').addEventListener('change',function(){
 });
 
 load();
+if(sortAsc)document.getElementById('B_SORT').innerHTML='<span class="ticon">🔼</span>Oldest';
 fillCurSelect('F_TCUR','USD');
 fillCurSelect('F_GCUR','USD');
 fillCurSelect('F_ECUR','USD');
