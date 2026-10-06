@@ -143,7 +143,15 @@ body{background:var(--bg);color:var(--text);font-family:var(--fb);min-height:100
 .day-card.open .day-body{display:block}
 .day-notes{display:flex;align-items:flex-start;gap:8px;padding:9px 13px;background:rgba(240,165,0,0.05);border-bottom:1px solid var(--border)}
 .day-notes .ni{font-size:13px;flex-shrink:0;margin-top:1px}
-.day-notes .nt{font-size:12px;color:var(--muted);font-style:italic;flex:1;line-height:1.5}
+.day-notes .nt{font-size:12px;color:var(--muted);font-style:italic;flex:1;line-height:1.5;white-space:pre-wrap;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;cursor:pointer;unicode-bidi:plaintext}
+.sheet.tall{display:flex;flex-direction:column;height:92vh;max-height:92vh;padding-bottom:max(18px,env(safe-area-inset-bottom))}
+.sheet.tall.half{height:58vh;max-height:58vh}
+.sheet-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:14px}
+.sheet-head h2{margin-bottom:0!important;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.icon-btn{background:var(--surf2);border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:15px;padding:7px 11px;cursor:pointer;flex-shrink:0}
+.note-read{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;font-size:16px;line-height:1.65;white-space:pre-wrap;word-wrap:break-word;user-select:text;-webkit-user-select:text;unicode-bidi:plaintext;background:var(--surf2);border:1px solid var(--border);border-radius:12px;padding:14px 15px;margin-bottom:14px}
+.note-read a{color:#60a5fa}
+#F_NOTES{flex:1;min-height:0;resize:none;font-size:16px;line-height:1.6;unicode-bidi:plaintext}
 .day-notes .ne{background:none;border:none;color:var(--muted);font-size:14px;cursor:pointer;padding:2px 4px;flex-shrink:0;user-select:none}
 .add-note-btn{width:calc(100% - 22px);margin:8px 11px 0;padding:9px;background:transparent;border:1px dashed rgba(240,165,0,0.3);border-radius:10px;color:rgba(240,165,0,0.6);font-family:var(--fb);font-size:12px;cursor:pointer;text-align:left;user-select:none;display:block}
 .add-exp-btn{width:calc(100% - 22px);margin:8px 11px;padding:10px;background:var(--surf2);border:1px dashed var(--border);border-radius:10px;color:var(--muted);font-family:var(--fb);font-size:12px;cursor:pointer;user-select:none;display:block;text-align:left}
@@ -299,7 +307,7 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(.5)}
     <div class="handle"></div>
     <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:18px">
       <h2 style="margin-bottom:0">Settings</h2>
-      <span style="font-size:11px;color:var(--muted);font-family:var(--fb)">v1.19</span>
+      <span style="font-size:11px;color:var(--muted);font-family:var(--fb)">v1.20</span>
     </div>
     <div class="field"><label>Primary Currency (your home currency)</label>
       <select id="F_PRIMCUR"></select>
@@ -447,12 +455,23 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(.5)}
 </div>
 <input type="file" id="F_VOUCHER_FILE" accept="application/pdf,image/*,.pdf" multiple style="display:none">
 <input type="file" id="F_PASS_FILE" accept="application/pdf,image/*,.pdf" multiple style="display:none">
-<div class="overlay" id="OVL_NOTES">
-  <div class="sheet">
+<div class="overlay" id="OVL_NOTE_READ">
+  <div class="sheet tall">
     <div class="handle"></div>
-    <h2 id="NOTES_TITLE">Day Notes</h2>
-    <div class="field"><label>Notes / Highlights (optional)</label>
-      <textarea id="F_NOTES" rows="5" placeholder="e.g. Visited the Eiffel Tower, amazing sunset..."></textarea>
+    <div class="sheet-head"><h2 id="NOTE_READ_TITLE">Day Notes</h2><button class="icon-btn" id="B_NOTE_READ_CLOSE">✕</button></div>
+    <div class="note-read" id="NOTE_READ_BODY" dir="auto"></div>
+    <div class="btn2">
+      <button class="cancel" id="B_NOTE_COPY">📋 Copy</button>
+      <button class="ok" id="B_NOTE_EDIT">✏️ Edit</button>
+    </div>
+  </div>
+</div>
+<div class="overlay" id="OVL_NOTES">
+  <div class="sheet tall" id="NOTES_SHEET">
+    <div class="handle"></div>
+    <div class="sheet-head"><h2 id="NOTES_TITLE">Day Notes</h2><button class="icon-btn" id="B_NOTES_SIZE" title="Bigger / smaller">⤡</button></div>
+    <div class="field" style="flex:1;display:flex;flex-direction:column;min-height:0;margin-bottom:12px"><label>Notes / Highlights (optional)</label>
+      <textarea id="F_NOTES" dir="auto" placeholder="e.g. Visited the Eiffel Tower, amazing sunset..."></textarea>
     </div>
     <div class="btn2">
       <button class="cancel" id="B_NOTES_CANCEL">Cancel</button>
@@ -1701,7 +1720,7 @@ function renderDetail(){
       tabD+='<div class="day-right"><div class="day-tot"><div class="v">'+(tot2>0?fmt(tot2,cur):'—')+'</div>'+(ss&&tot2>0?'<div class="s">'+ss+'</div>':'')+'</div><div class="dchev">›</div></div></div>';
       tabD+='<div class="day-body" id="DB_'+d+'" style="display:none">';
       if(note){
-        tabD+='<div class="day-notes"><span class="ni">📝</span><span class="nt">'+note+'</span><button class="ne" data-action="edit-note" data-date="'+d+'" data-idx="'+i+'">✏️</button></div>';
+        tabD+='<div class="day-notes"><span class="ni">📝</span><span class="nt" dir="auto" data-action="read-note" data-date="'+d+'" data-idx="'+i+'">'+esc(note)+'</span><button class="ne" data-action="edit-note" data-date="'+d+'" data-idx="'+i+'">✏️</button></div>';
       } else {
         tabD+='<button class="add-note-btn" data-action="add-note" data-date="'+d+'" data-idx="'+i+'">📝 Add notes for Day '+(i+1)+'...</button>';
       }
@@ -2136,7 +2155,29 @@ function openNoteForm(date,idx){
   var dn=new Date(date+'T00:00:00');
   document.getElementById('NOTES_TITLE').textContent='Day '+(idx+1)+' — '+dn.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
   document.getElementById('F_NOTES').value=(t.notes||{})[date]||'';
+  setNotesSize(sGet('voy_notes_half')==='1');
   openOvl('OVL_NOTES');
+  setTimeout(function(){var ta=document.getElementById('F_NOTES');ta.focus();ta.setSelectionRange(ta.value.length,ta.value.length);ta.scrollTop=ta.scrollHeight;},250);
+}
+function linkify(html){return html.replace(/(https?:\/\/[^\s<]+)/g,'<a href="$1" target="_blank" rel="noopener">$1</a>');}
+function openNoteReader(date,idx){
+  curDay=date;
+  var t=getTrip(curTripId),note=(t.notes||{})[date]||'';
+  var dn=new Date(date+'T00:00:00');
+  document.getElementById('NOTE_READ_TITLE').textContent='📝 Day '+(idx+1)+' — '+dn.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
+  document.getElementById('NOTE_READ_BODY').innerHTML=linkify(esc(note));
+  document.getElementById('B_NOTE_EDIT').dataset.idx=idx;
+  openOvl('OVL_NOTE_READ');
+  document.getElementById('NOTE_READ_BODY').scrollTop=0;
+}
+function copyText(txt){
+  function fallback(){var ta=document.createElement('textarea');ta.value=txt;ta.style.position='fixed';ta.style.opacity='0';document.body.appendChild(ta);ta.select();try{document.execCommand('copy');toast('Copied!');}catch(e){toast('Could not copy');}ta.remove();}
+  if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(txt).then(function(){toast('Copied!');},fallback);else fallback();
+}
+function setNotesSize(half){
+  document.getElementById('NOTES_SHEET').classList.toggle('half',half);
+  document.getElementById('B_NOTES_SIZE').textContent=half?'⤢':'⤡';
+  sSet('voy_notes_half',half?'1':'0');
 }
 function saveNotes(){
   var note=document.getElementById('F_NOTES').value.trim();
@@ -2696,6 +2737,10 @@ document.addEventListener('click',function(e){
     if(eid==='B_QA_CANCEL'){closeOvl('OVL_QUICK');return;}
     if(eid==='B_QA_SAVE'){saveQuickAdd();return;}
     if(eid==='B_NOTES_CANCEL'){closeOvl('OVL_NOTES');return;}
+    if(eid==='B_NOTES_SIZE'){setNotesSize(!document.getElementById('NOTES_SHEET').classList.contains('half'));return;}
+    if(eid==='B_NOTE_READ_CLOSE'){closeOvl('OVL_NOTE_READ');return;}
+    if(eid==='B_NOTE_COPY'){var tn=getTrip(curTripId);copyText(((tn&&tn.notes)||{})[curDay]||'');return;}
+    if(eid==='B_NOTE_EDIT'){closeOvl('OVL_NOTE_READ');openNoteForm(curDay,parseInt(el.dataset.idx,10));return;}
     if(eid==='B_NOTES_SAVE'){saveNotes();return;}
 
     // Quick-add category chip selection
@@ -2790,6 +2835,7 @@ document.addEventListener('click',function(e){
     if(a==='add-exp'){openExpForm(el.dataset.date,parseInt(el.dataset.idx));return;}
     if(a==='edit-exp'){openExpForm(el.dataset.date,parseInt(el.dataset.dayidx||0),parseInt(el.dataset.idx));return;}
     if(a==='del-exp'){delExp(el.dataset.date,parseInt(el.dataset.idx));return;}
+    if(a==='read-note'){openNoteReader(el.dataset.date,parseInt(el.dataset.idx,10));return;}
     if(a==='add-note'||a==='edit-note'){openNoteForm(el.dataset.date,parseInt(el.dataset.idx));return;}
     if(a==='pick-emoji'){pickEmoji=el.dataset.emoji;document.querySelectorAll('.epick').forEach(function(e){e.classList.remove('sel');});el.classList.add('sel');updatePreview();return;}
     if(a==='pick-color'){
