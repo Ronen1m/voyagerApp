@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Voyager Expenses v3</title>
-<link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@400;500&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <meta name="theme-color" content="#0f1923">
@@ -307,7 +307,7 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(.5)}
     <div class="handle"></div>
     <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:18px">
       <h2 style="margin-bottom:0">Settings</h2>
-      <span style="font-size:11px;color:var(--muted);font-family:var(--fb)">v1.21</span>
+      <span style="font-size:11px;color:var(--muted);font-family:var(--fb)">v1.22</span>
     </div>
     <div class="field"><label>Primary Currency (your home currency)</label>
       <select id="F_PRIMCUR"></select>
@@ -2903,7 +2903,7 @@ fillSecSelect('F_SECCUR',settings.sec||'');
 renderHome();
 
 // PWA service worker - only on HTTPS hosted pages
-if('serviceWorker' in navigator && location.protocol === 'https:'){
+if('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')){
   navigator.serviceWorker.register('/voyagerApp/sw.js', {updateViaCache:'none'}).then(function(reg){
     reg.update();
     // check for a new version whenever the app comes back to the screen
