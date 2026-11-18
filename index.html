@@ -108,6 +108,8 @@ body{background:var(--bg);color:var(--text);font-family:var(--fb);min-height:100
 .tab{flex:1;padding:9px 4px;border-radius:10px;border:none;font-family:var(--fh);font-size:12px;font-weight:600;background:var(--surf2);color:var(--muted);cursor:pointer;user-select:none}
 .tab.on{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff}
 .tabpane{display:none}.tabpane.on{display:block}
+.list-sec{font-family:var(--fh);font-weight:700;font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:16px 2px 8px;display:flex;align-items:center;gap:8px}
+.list-sec:first-of-type{margin-top:4px}
 .sec-title{font-family:var(--fh);font-weight:700;font-size:15px;margin:18px 0 10px;display:flex;align-items:center;gap:8px}
 .badge{background:var(--surf2);color:var(--muted);font-size:11px;padding:2px 8px;border-radius:20px}
 .gcards{display:grid;grid-template-columns:1fr 1fr;gap:8px}
@@ -307,7 +309,7 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(.5)}
     <div class="handle"></div>
     <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:18px">
       <h2 style="margin-bottom:0">Settings</h2>
-      <span style="font-size:11px;color:var(--muted);font-family:var(--fb)">v1.25</span>
+      <span style="font-size:11px;color:var(--muted);font-family:var(--fb)">v1.26</span>
     </div>
     <div class="field"><label>Primary Currency (your home currency)</label>
       <select id="F_PRIMCUR"></select>
@@ -688,7 +690,18 @@ function renderHome(){
     return sortMode==='oldest'?(da>db?1:da<db?-1:0):(db>da?1:db<da?-1:0);
   });
   var html=countdownHTML();
+  var lastGroup=null;
   sorted.forEach(function(t){
+    // Section titles in "Upcoming" order: Upcoming trips / Past trips
+    if(sortMode==='upcoming'){
+      var st=isoDate(t.start),en=isoDate(t.end)||st;
+      var grp=!st?'nodate':(en>=today?'up':'past');
+      if(grp!==lastGroup){
+        var cnt=sorted.filter(function(x){var s2=isoDate(x.start),e2=isoDate(x.end)||s2;return (!s2?'nodate':(e2>=today?'up':'past'))===grp;}).length;
+        html+='<div class="list-sec">'+({up:'✈️ Upcoming trips',past:'🗂️ Past trips',nodate:'📝 No dates'}[grp])+' <span class="badge">'+cnt+'</span></div>';
+        lastGroup=grp;
+      }
+    }
     var cur=t.cur||'USD',nd=getDays(t).length;
     var msl=tripStartMs(t.start)-Date.now(), dl=Math.floor(msl/86400000);
     var chip=(msl>0)?'<span class="cd-chip">⏳ '+(dl<1?'&lt;1 day':dl+(dl===1?' day':' days'))+'</span>':'';
