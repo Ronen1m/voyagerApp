@@ -307,7 +307,7 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(.5)}
     <div class="handle"></div>
     <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:18px">
       <h2 style="margin-bottom:0">Settings</h2>
-      <span style="font-size:11px;color:var(--muted);font-family:var(--fb)">v1.24</span>
+      <span style="font-size:11px;color:var(--muted);font-family:var(--fb)">v1.25</span>
     </div>
     <div class="field"><label>Primary Currency (your home currency)</label>
       <select id="F_PRIMCUR"></select>
@@ -535,7 +535,7 @@ var _mem={};
 function sGet(k){try{return localStorage.getItem(k);}catch(e){return _mem[k]||null;}}
 function sSet(k,v){try{localStorage.setItem(k,v);}catch(e){_mem[k]=v;}}
 
-var trips=[],settings={prim:'ILS',sec:'',rates:{}};var sortAsc=false;
+var trips=[],settings={prim:'ILS',sec:'',rates:{}};var sortAsc=false,sortMode='upcoming';
 var curTripId=null,editTripId=null,curDay=null,editGenIdx=-1,editExpIdx=-1,pickImage=null;
 var pickEmoji=EMOJIS[0],pickColor=DEF_COLOR;
 
@@ -558,7 +558,7 @@ function load(){
         var a=isoDate(t.start),b=isoDate(t.end);
         if(a&&a!==t.start)t.start=a; if(b&&b!==t.end)t.end=b;
       });
-      sortAsc=sGet('voy_sort_asc')==='1';
+      sortMode=sGet('voy_sort_mode')||'upcoming';
       settings=p.settings||{prim:'ILS',sec:'',rates:{}};
       if(!settings.rates)settings.rates={};
       if(!settings.prim)settings.prim='ILS';
@@ -673,12 +673,19 @@ function renderHome(){
     el.innerHTML='<div class="empty"><div class="ei">🗺️</div><p>No trips yet.<br>Tap <strong>+ New Trip</strong> to start!</p></div>';
     return;
   }
-  // By departure date (newest first by default); trips without a date always go last
+  // Sort by departure date. 'upcoming' (default): current & future trips first, soonest at the top,
+  // then past trips, most recent first. 'newest' / 'oldest': plain date order. No date = always last.
+  var today=toDateStr(new Date());
   var sorted=trips.slice().sort(function(a,b){
     var da=isoDate(a.start),db=isoDate(b.start);
     if(!da&&!db)return 0; if(!da)return 1; if(!db)return -1;
     if(da===db){da=isoDate(a.end)||da;db=isoDate(b.end)||db;}
-    return sortAsc?(da>db?1:da<db?-1:0):(db>da?1:db<da?-1:0);
+    if(sortMode==='upcoming'){
+      var fa=(isoDate(a.end)||da)>=today, fb=(isoDate(b.end)||db)>=today;
+      if(fa!==fb)return fa?-1:1;
+      return fa?(da>db?1:da<db?-1:0):(db>da?1:db<da?-1:0);
+    }
+    return sortMode==='oldest'?(da>db?1:da<db?-1:0):(db>da?1:db<da?-1:0);
   });
   var html=countdownHTML();
   sorted.forEach(function(t){
@@ -2723,7 +2730,7 @@ document.addEventListener('click',function(e){
       document.getElementById('RF_CUSTOM_RATE').value='';
       return;
     }
-    if(eid==='B_SORT'){sortAsc=!sortAsc;sSet('voy_sort_asc',sortAsc?'1':'0');document.getElementById('B_SORT').innerHTML=sortAsc?'<span class="ticon">🔼</span>Oldest':'<span class="ticon">🔽</span>Newest';renderHome();return;}
+    if(eid==='B_SORT'){sortMode={upcoming:'newest',newest:'oldest',oldest:'upcoming'}[sortMode]||'upcoming';sSet('voy_sort_mode',sortMode);setSortLabel();renderHome();toast({upcoming:'📅 Upcoming trips first',newest:'🔽 Newest date first',oldest:'🔼 Oldest date first'}[sortMode]);return;}
     if(eid==='B_TRIP_CANCEL'){closeOvl('OVL_TRIP');return;}
     if(eid==='B_UPLOAD_ICON'){document.getElementById('F_ICON_IMAGE').click();return;}
     if(eid==='B_CLEAR_ICON'){pickImage=null;document.getElementById('F_ICON_IMAGE').value='';updatePreview();return;}
@@ -2894,7 +2901,8 @@ document.getElementById('F_ICON_IMAGE').addEventListener('change',function(){
 });
 
 load();
-if(sortAsc)document.getElementById('B_SORT').innerHTML='<span class="ticon">🔼</span>Oldest';
+function setSortLabel(){document.getElementById('B_SORT').innerHTML={upcoming:'<span class="ticon">📅</span>Upcoming',newest:'<span class="ticon">🔽</span>Newest',oldest:'<span class="ticon">🔼</span>Oldest'}[sortMode]||'';}
+setSortLabel();
 fillCurSelect('F_TCUR','ILS');
 fillCurSelect('F_GCUR','USD');
 fillCurSelect('F_ECUR','USD');
