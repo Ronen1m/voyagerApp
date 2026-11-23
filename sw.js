@@ -1,4 +1,4 @@
-var CACHE = 'voyager-v28'; // change this number every time you publish an update
+var CACHE = 'voyager-v29'; // change this number every time you publish an update
 var PAGE = '/voyagerApp/index.html';
 var FILES = [
   '/voyagerApp/',
@@ -75,7 +75,7 @@ function savedPage(){
 self.addEventListener('fetch', function(e){
   var req = e.request;
   // Never cache live flight data or non-GET requests
-  if (req.method !== 'GET' || req.url.indexOf('airlabs.co') >= 0 || req.url.indexOf('rapidapi.com') >= 0) return;
+  if (req.method !== 'GET' || req.url.indexOf('airlabs.co') >= 0 || req.url.indexOf('rapidapi.com') >= 0 || req.url.indexOf('api.github.com') >= 0) return;
 
   var isPage = req.mode === 'navigate' || /\/voyagerApp\/(index\.html)?(\?.*)?$/.test(req.url);
   if (isPage) {

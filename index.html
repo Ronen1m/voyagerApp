@@ -46,6 +46,17 @@ body{background:var(--bg);color:var(--text);font-family:var(--fb);min-height:100
 .cd-sep{font-family:var(--fh);font-size:16px;font-weight:800;color:var(--accent);opacity:.7}
 .cd-now{font-family:var(--fh);font-size:16px;font-weight:800;color:var(--green)}
 .cd-chip{display:inline-block;margin-left:6px;padding:1px 7px;border-radius:10px;background:rgba(240,165,0,0.14);color:var(--accent);font-size:10px;font-weight:700;vertical-align:1px}
+.sync-chip{margin-left:auto;display:inline-flex;align-items:center;gap:3px;background:var(--surf2);border:1px solid var(--border);border-radius:20px;padding:4px 10px;font-size:13px;color:var(--text);cursor:pointer}
+.sync-chip.ok{border-color:rgba(45,212,160,0.45)}.sync-chip.ok span{color:var(--green);font-weight:700}
+.sync-chip.error{border-color:rgba(240,82,82,0.5)}
+.sync-chip .spin{display:inline-block;animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.sync-info{font-size:13px;line-height:1.55;color:var(--muted);margin-bottom:14px}
+.sync-note{font-size:11px;color:var(--muted);margin:-4px 0 14px}
+.sync-box{background:var(--surf2);border:1px solid var(--border);border-radius:12px;padding:12px 14px;margin-bottom:6px}
+.sync-repo{font-family:var(--fh);font-weight:700;font-size:14px;word-break:break-all}
+.sync-st{font-size:13px;margin-top:6px}.sync-st.ok{color:var(--green)}.sync-st.error{color:var(--red)}
+.sync-last{font-size:11px;color:var(--muted);margin-top:4px}
 .bk-row{display:flex;gap:6px;margin-top:6px}
 .bk{position:relative;display:inline-flex;align-items:center;justify-content:center;width:26px;height:22px;border-radius:7px;font-size:12px;background:rgba(255,255,255,0.03);border:1px dashed rgba(255,255,255,0.14);filter:grayscale(1);opacity:.45}
 .bk.on{background:rgba(45,212,160,0.12);border:1px solid rgba(45,212,160,0.45);filter:none;opacity:1}
@@ -243,6 +254,7 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(.5)}
   <div class="topbar-row1">
     <span class="logo-icon">✈️</span>
     <div class="logo">Voyager</div>
+    <button class="sync-chip" id="B_SYNC" style="display:none" title="Cloud backup">☁️</button>
   </div>
   <div class="topbar-btns">
     <button class="tbtn primary" id="B_NEW_TRIP"><span class="ticon">＋</span>New Trip</button>
@@ -309,12 +321,19 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(.5)}
 </div>
 <input type="file" id="F_ICON_IMAGE" accept="image/*" style="display:none">
 
+<div class="overlay" id="OVL_SYNC">
+  <div class="sheet">
+    <div class="handle"></div>
+    <h2>☁️ Cloud backup</h2>
+    <div id="SYNC_BODY"></div>
+  </div>
+</div>
 <div class="overlay" id="OVL_SETTINGS">
   <div class="sheet">
     <div class="handle"></div>
     <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:18px">
       <h2 style="margin-bottom:0">Settings</h2>
-      <span style="font-size:11px;color:var(--muted);font-family:var(--fb)">v1.28</span>
+      <span style="font-size:11px;color:var(--muted);font-family:var(--fb)">v1.29</span>
     </div>
     <div class="field"><label>Primary Currency (your home currency)</label>
       <select id="F_PRIMCUR"></select>
@@ -334,6 +353,7 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(.5)}
         </div>
       </div>
     </div>
+    <button class="add-gen-btn" id="B_SYNC_SETTINGS" style="margin:4px 0 14px">☁️ Cloud backup (GitHub)</button>
     <div class="btn2">
       <button class="cancel" id="B_SET_CANCEL">Cancel</button>
       <button class="ok" id="B_SET_SAVE">Save</button>
@@ -603,6 +623,7 @@ function save(){
         delete _mem['voy3_img_'+t.id];
       }
     });
+    markDirty();
   } catch(e) {
     console.error('Save failed:',e);
     toast('Warning: Could not save data!');
@@ -741,6 +762,258 @@ function renderHome(){
   });
   el.innerHTML=html;
   tickCountdown();
+}
+
+// ══════════════════════ CLOUD BACKUP (private GitHub repo) ══════════════════════
+// The phone stays the main copy (works offline). When online, changes are pushed to the
+// person's OWN private repo as one commit. Settings (repo + access key) live only on this phone.
+// Repo layout: trips.json · images/<tripId>.txt · files/<fileId>/orig.<ext> · files/<fileId>/p<n>.<ext>
+var SYNC_KEY='voy_sync';
+var _sync={timer:null,running:false,again:false,gen:0,state:'off',msg:''};
+function syncCfg(){try{var c=JSON.parse(sGet(SYNC_KEY)||'null');return c&&c.repo&&c.token?c:null;}catch(e){return null;}}
+function syncSetCfg(c){if(c)sSet(SYNC_KEY,JSON.stringify(c));else{try{localStorage.removeItem(SYNC_KEY);}catch(e){}delete _mem[SYNC_KEY];}}
+function markDirty(){
+  if(!syncCfg())return;
+  _sync.gen++;sSet('voy_sync_dirty','1');setSyncState('pending');
+  clearTimeout(_sync.timer);_sync.timer=setTimeout(function(){syncNow(false);},4000);
+}
+
+// --- tiny GitHub API client ---
+function ghErrMsg(st,j){
+  if(st===401)return 'The access key is wrong or has expired';
+  if(st===403)return 'The access key has no permission for this repository (needs Contents: Read and write)';
+  if(st===404)return 'Repository not found — check the name, and that the access key includes it';
+  if(st===422&&j&&j.message)return 'GitHub: '+j.message;
+  return (j&&j.message)?'GitHub: '+j.message:'GitHub error '+st;
+}
+function gh(cfg,method,path,body){
+  var h={'Authorization':'Bearer '+cfg.token,'Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28'};
+  if(body)h['Content-Type']='application/json';
+  return fetch('https://api.github.com'+path,{method:method,headers:h,body:body?JSON.stringify(body):undefined,cache:'no-store'})
+    .then(function(r){return r.text().then(function(tx){
+      var j=null;try{j=tx?JSON.parse(tx):null;}catch(e){}
+      if(!r.ok){var err=new Error(ghErrMsg(r.status,j));err.status=r.status;throw err;}
+      return j;
+    });},function(){throw new Error('No internet connection');});
+}
+function repoPath(cfg){return '/repos/'+cfg.repo.split('/').map(encodeURIComponent).join('/');}
+var _te=new TextEncoder(),_td=new TextDecoder();
+function bytesToB64(u8){var s='',CH=0x8000;for(var i=0;i<u8.length;i+=CH)s+=String.fromCharCode.apply(null,u8.subarray(i,i+CH));return btoa(s);}
+function b64ToBytes(b64){var bin=atob(String(b64).replace(/\s/g,'')),u8=new Uint8Array(bin.length);for(var i=0;i<bin.length;i++)u8[i]=bin.charCodeAt(i);return u8;}
+function blobBytes(b){return b.arrayBuffer().then(function(ab){return new Uint8Array(ab);});}
+// git's id for a file: sha1("blob <size>\0" + content) — lets us skip files that are already in the repo
+function gitBlobSha(u8){
+  var head=_te.encode('blob '+u8.length+'\0'),all=new Uint8Array(head.length+u8.length);all.set(head,0);all.set(u8,head.length);
+  return crypto.subtle.digest('SHA-1',all).then(function(d){return Array.prototype.map.call(new Uint8Array(d),function(x){return ('0'+x.toString(16)).slice(-2);}).join('');});
+}
+function extOf(name,type){
+  var m=String(name||'').match(/\.([a-z0-9]{1,5})$/i);if(m)return m[1].toLowerCase();
+  return {'application/pdf':'pdf','image/png':'png','image/jpeg':'jpg','image/webp':'webp','image/heic':'heic','image/gif':'gif'}[type]||'bin';
+}
+function typeOfExt(ext){return {pdf:'application/pdf',png:'image/png',jpg:'image/jpeg',jpeg:'image/jpeg',webp:'image/webp',heic:'image/heic',gif:'image/gif'}[ext]||'application/octet-stream';}
+
+function remoteState(cfg){
+  return gh(cfg,'GET',repoPath(cfg)).then(function(info){
+    if(info&&info.private===false)throw new Error('This repository is PUBLIC — anyone could see your trips. Use a private repository.');
+    var branch=(info&&info.default_branch)||'main';
+    return gh(cfg,'GET',repoPath(cfg)+'/git/ref/heads/'+encodeURIComponent(branch)).catch(function(e){
+      if(e.status===404||e.status===409)return null;throw e;   // empty repository
+    }).then(function(ref){
+      if(!ref)return {branch:branch,head:null,treeSha:null,files:{}};
+      var head=ref.object.sha;
+      return gh(cfg,'GET',repoPath(cfg)+'/git/commits/'+head).then(function(c){
+        return gh(cfg,'GET',repoPath(cfg)+'/git/trees/'+c.tree.sha+'?recursive=1').then(function(t){
+          var files={};(t.tree||[]).forEach(function(x){if(x.type==='blob')files[x.path]=x.sha;});
+          return {branch:branch,head:head,treeSha:c.tree.sha,files:files};
+        });
+      });
+    });
+  });
+}
+function initRepo(cfg){
+  return gh(cfg,'PUT',repoPath(cfg)+'/contents/README.md',{message:'Start Voyager backup',
+    content:bytesToB64(_te.encode('# Voyager backup\n\nPrivate backup of the Voyager travel app. Managed by the app — please don\'t edit.\n'))});
+}
+
+// Everything that should be in the backup, as path -> loader of bytes
+function allFileMetas(){
+  var out=[];
+  trips.forEach(function(t){
+    (t.passes||[]).forEach(function(p){out.push({id:p.id,name:p.fileName,type:p.fileType});});
+    (t.gen||[]).forEach(function(g){(g.vouchers||[]).forEach(function(v){out.push({id:v.id,name:v.fileName,type:v.fileType});});});
+  });
+  return out;
+}
+function buildSnapshot(){
+  var snap={};
+  var data={app:'voyager',format:1,settings:settings,trips:trips.map(function(t){var c={};Object.keys(t).forEach(function(k){if(k!=='iconImage')c[k]=t[k];});return c;})};
+  snap['trips.json']={bytes:_te.encode(JSON.stringify(data,null,1))};
+  trips.forEach(function(t){if(t.iconImage)snap['images/'+t.id+'.txt']={bytes:_te.encode(t.iconImage)};});
+  return allFileMetas().reduce(function(chain,f){
+    return chain.then(function(){return idbGet(f.id).then(function(rec){
+      if(!rec||!rec.orig)return;
+      snap['files/'+f.id+'/orig.'+extOf(f.name,f.type||rec.orig.type)]={fixed:true,blob:rec.orig};
+      (rec.pages||[]).forEach(function(pg,i){snap['files/'+f.id+'/p'+i+'.'+extOf('',pg.type)]={fixed:true,blob:pg};});
+    }).catch(function(){});});
+  },Promise.resolve()).then(function(){return snap;});
+}
+function isOurs(path){return path==='trips.json'||path.indexOf('images/')===0||path.indexOf('files/')===0;}
+
+function syncNow(manual){
+  var cfg=syncCfg();if(!cfg)return Promise.resolve();
+  if(_sync.running){_sync.again=true;return Promise.resolve();}
+  if(navigator.onLine===false){setSyncState('pending');if(manual)toast('No internet — will back up when online');return Promise.resolve();}
+  _sync.running=true;var gen=_sync.gen;setSyncState('syncing');
+  var R,uploaded=0;
+  return remoteState(cfg).then(function(r){
+    R=r;
+    if(!R.head)return initRepo(cfg).then(function(){return remoteState(cfg).then(function(r2){R=r2;});});
+  }).then(function(){
+    // never let an empty phone wipe a backup that has trips
+    if(!trips.length&&R.files['trips.json'])throw new Error('This phone has no trips but the backup does — use "Restore from backup"');
+    return buildSnapshot();
+  }).then(function(snap){
+    var items=[],paths=Object.keys(snap);
+    return paths.reduce(function(chain,path){
+      return chain.then(function(){
+        var e=snap[path];
+        if(e.fixed&&R.files[path])return;                 // files never change once saved
+        return (e.bytes?Promise.resolve(e.bytes):blobBytes(e.blob)).then(function(u8){
+          return gitBlobSha(u8).then(function(sha){
+            if(R.files[path]===sha)return;                // unchanged
+            return gh(cfg,'POST',repoPath(cfg)+'/git/blobs',{content:bytesToB64(u8),encoding:'base64'}).then(function(b){
+              uploaded++;items.push({path:path,mode:'100644',type:'blob',sha:b.sha});
+            });
+          });
+        });
+      });
+    },Promise.resolve()).then(function(){
+      Object.keys(R.files).forEach(function(p){if(isOurs(p)&&!snap[p])items.push({path:p,mode:'100644',type:'blob',sha:null});});
+      if(!items.length)return null;
+      return gh(cfg,'POST',repoPath(cfg)+'/git/trees',{base_tree:R.treeSha,tree:items}).then(function(t){
+        return gh(cfg,'POST',repoPath(cfg)+'/git/commits',{message:'Backup '+new Date().toISOString().slice(0,16).replace('T',' ')+' · '+trips.length+' trips',tree:t.sha,parents:[R.head]});
+      }).then(function(c){
+        return gh(cfg,'PATCH',repoPath(cfg)+'/git/refs/heads/'+encodeURIComponent(R.branch),{sha:c.sha});
+      });
+    });
+  }).then(function(){
+    var c=syncCfg();if(c){c.last=Date.now();c.err='';syncSetCfg(c);}
+    if(_sync.gen===gen)sSet('voy_sync_dirty','0');
+    setSyncState(sGet('voy_sync_dirty')==='1'?'pending':'ok');
+    if(manual)toast('☁️ Backed up');
+  }).catch(function(err){
+    var c=syncCfg();if(c){c.err=err.message;syncSetCfg(c);}
+    setSyncState(navigator.onLine===false?'pending':'error',err.message);
+    if(manual)toast('⚠️ '+err.message);
+  }).then(function(){
+    _sync.running=false;
+    if(_sync.again){_sync.again=false;setTimeout(function(){syncNow(false);},500);}
+    renderSyncSheet();
+  });
+}
+
+function restoreFromBackup(){
+  var cfg=syncCfg();if(!cfg)return Promise.resolve();
+  setSyncState('syncing');
+  var R;
+  var blob=function(sha){return gh(cfg,'GET',repoPath(cfg)+'/git/blobs/'+sha).then(function(b){return b64ToBytes(b.content);});};
+  return remoteState(cfg).then(function(r){
+    R=r;if(!R.files['trips.json'])throw new Error('The backup is empty — nothing to restore yet');
+    return blob(R.files['trips.json']);
+  }).then(function(u8){
+    var data=JSON.parse(_td.decode(u8));
+    if(!data||!Array.isArray(data.trips))throw new Error('The backup file looks damaged');
+    var metaType={};
+    data.trips.forEach(function(t){(t.passes||[]).forEach(function(p){metaType[p.id]=p.fileType;});(t.gen||[]).forEach(function(g){(g.vouchers||[]).forEach(function(v){metaType[v.id]=v.fileType;});});});
+    var recs={},jobs=[];
+    Object.keys(R.files).forEach(function(p){
+      var m=p.match(/^files\/([^\/]+)\/(orig|p(\d+))\.([a-z0-9]+)$/i);
+      if(m)jobs.push(function(){return blob(R.files[p]).then(function(b){
+        var id=m[1],r=recs[id]||(recs[id]={orig:null,pages:[]}),bl=new Blob([b],{type:m[2]==='orig'?(metaType[id]||typeOfExt(m[4])):typeOfExt(m[4])});
+        if(m[2]==='orig')r.orig=bl;else r.pages[+m[3]]=bl;
+      });});
+      var mi=p.match(/^images\/([^\/]+)\.txt$/);
+      if(mi)jobs.push(function(){return blob(R.files[p]).then(function(b){
+        data.trips.forEach(function(t){if(t.id===mi[1])t.iconImage=_td.decode(b);});
+      });});
+    });
+    var n=0,total=jobs.length;
+    return jobs.reduce(function(ch,job){return ch.then(job).then(function(){n++;setSyncState('syncing','Restoring… '+n+'/'+total);});},Promise.resolve())
+      .then(function(){return Promise.all(Object.keys(recs).map(function(id){var r=recs[id];r.pages=r.pages.filter(Boolean);return r.orig?idbPut(id,r):null;}));})
+      .then(function(){
+        trips=data.trips;if(data.settings)settings=data.settings;
+        if(!settings.rates)settings.rates={};
+        var c=syncCfg();if(c){c.last=Date.now();c.err='';syncSetCfg(c);}
+        save();sSet('voy_sync_dirty','0');clearTimeout(_sync.timer);
+        setSyncState('ok');renderHome();
+        toast('☁️ Restored '+trips.length+' trip'+(trips.length!==1?'s':''));
+      });
+  }).catch(function(err){setSyncState('error',err.message);toast('⚠️ '+err.message);})
+    .then(renderSyncSheet);
+}
+
+// --- status chip + settings sheet ---
+function setSyncState(st,msg){
+  _sync.state=st;_sync.msg=msg||'';
+  var b=document.getElementById('B_SYNC');if(!b)return;
+  if(!syncCfg()){b.style.display='none';return;}
+  b.style.display='';
+  b.className='sync-chip '+st;
+  b.innerHTML={ok:'☁️<span>✓</span>',pending:'☁️<span>⏳</span>',syncing:'☁️<span class="spin">↻</span>',error:'☁️<span>⚠️</span>'}[st]||'☁️';
+  b.title={ok:'Backed up',pending:'Waiting to back up',syncing:'Backing up…',error:'Backup problem'}[st]||'';
+  renderSyncSheet();
+}
+function fmtWhen(ms){if(!ms)return 'never';var d=new Date(ms);return d.toLocaleDateString('en-GB',{day:'numeric',month:'short'})+' '+d.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});}
+function openSyncSheet(){renderSyncSheet();closeOvl('OVL_SETTINGS');openOvl('OVL_SYNC');}
+function renderSyncSheet(){
+  var el=document.getElementById('SYNC_BODY');if(!el)return;
+  var c=syncCfg(),h='';
+  if(!c){
+    h+='<div class="sync-info">Keep a copy of all your trips, boarding passes and vouchers in <b>your own private GitHub repository</b>. The app still works offline — it backs up automatically when there\'s internet.</div>';
+    h+='<div class="field"><label>Private repository</label><input id="F_SYNC_REPO" placeholder="e.g. Ronen1m/voyager-data" autocapitalize="off" autocorrect="off" spellcheck="false"></div>';
+    h+='<div class="field"><label>Access key (fine-grained token)</label><input id="F_SYNC_TOKEN" type="password" placeholder="github_pat_…" autocapitalize="off" autocorrect="off" spellcheck="false"></div>';
+    h+='<div class="sync-note">🔒 Saved only on this phone. Never share it.</div>';
+    h+='<div class="btn2"><button class="cancel" id="B_SYNC_CLOSE">Close</button><button class="ok" id="B_SYNC_CONNECT">Connect</button></div>';
+  } else {
+    var st=_sync.state,lbl={ok:'✅ Backed up',pending:'⏳ Waiting for internet / changes to back up',syncing:'↻ '+(_sync.msg||'Backing up…'),error:'⚠️ '+(_sync.msg||c.err||'Problem')}[st]||'';
+    h+='<div class="sync-box"><div class="sync-repo">☁️ '+esc(c.repo)+'</div><div class="sync-st '+st+'">'+esc(lbl)+'</div><div class="sync-last">Last backup: '+fmtWhen(c.last)+'</div></div>';
+    h+='<button class="add-gen-btn" id="B_SYNC_NOW">☁️ Back up now</button>';
+    h+='<button class="add-gen-btn" id="B_SYNC_RESTORE">⬇️ Restore from backup</button>';
+    h+='<button class="add-gen-btn" id="B_SYNC_OFF" style="color:var(--red)">Disconnect backup on this phone</button>';
+    h+='<div class="btn2" style="margin-top:14px"><button class="cancel" id="B_SYNC_CLOSE">Close</button></div>';
+  }
+  el.innerHTML=h;
+}
+function connectSync(){
+  var repo=(document.getElementById('F_SYNC_REPO').value||'').trim().replace(/^https?:\/\/github\.com\//i,'').replace(/\.git$/,'').replace(/\/+$/,'');
+  var token=(document.getElementById('F_SYNC_TOKEN').value||'').trim();
+  if(!/^[\w.-]+\/[\w.-]+$/.test(repo)){toast('Repository should look like owner/name');return;}
+  if(!token){toast('Paste the access key');return;}
+  var cfg={repo:repo,token:token};
+  var btn=document.getElementById('B_SYNC_CONNECT');btn.disabled=true;btn.textContent='Checking…';
+  remoteState(cfg).then(function(R){
+    syncSetCfg(cfg);
+    if(R.files['trips.json']){
+      var msg=trips.length?'This backup already has trips.\n\nOK — load the backup onto this phone (replaces what is on the phone)\nCancel — keep this phone\'s trips and back them up':'Found a backup with your trips. Load it onto this phone?';
+      if(confirm(msg))return restoreFromBackup();
+      if(!trips.length)return;
+    }
+    toast('☁️ Connected');_sync.gen++;sSet('voy_sync_dirty','1');
+    return syncNow(true);
+  }).catch(function(err){toast('⚠️ '+err.message);btn.disabled=false;btn.textContent='Connect';})
+    .then(function(){if(syncCfg()){setSyncState(_sync.state==='off'?'ok':_sync.state);renderSyncSheet();}});
+}
+function startSync(){
+  var c=syncCfg();
+  if(c){
+    setSyncState(sGet('voy_sync_dirty')==='1'?'pending':(c.err?'error':'ok'),c.err);
+    var stale=!c.last||Date.now()-c.last>6*3600*1000;
+    if(sGet('voy_sync_dirty')==='1'||stale)setTimeout(function(){syncNow(false);},1500);
+  } else setSyncState('off');
+  // always listen (backup may be connected later in this session); syncNow does nothing when off
+  window.addEventListener('online',function(){if(sGet('voy_sync_dirty')==='1')syncNow(false);});
+  // back up when returning to the app, and right away when leaving it
+  document.addEventListener('visibilitychange',function(){if(sGet('voy_sync_dirty')==='1'){clearTimeout(_sync.timer);syncNow(false);}});
 }
 
 // ══════════════════════ BOOKING QUICK VIEW ══════════════════════
@@ -2705,6 +2978,12 @@ document.addEventListener('click',function(e){
     if(eid==='B_BACKUP'){backupTrips();return;}
     if(eid==='B_IMPORT_BTN'){importTrips();return;}
     if(eid==='B_SETTINGS'){openSettings();return;}
+    if(eid==='B_SYNC'||eid==='B_SYNC_SETTINGS'){openSyncSheet();return;}
+    if(eid==='B_SYNC_CLOSE'){closeOvl('OVL_SYNC');return;}
+    if(eid==='B_SYNC_CONNECT'){connectSync();return;}
+    if(eid==='B_SYNC_NOW'){syncNow(true);return;}
+    if(eid==='B_SYNC_RESTORE'){if(confirm('Load the backup onto this phone?\n\nThis replaces the trips and files that are on this phone now.'))restoreFromBackup();return;}
+    if(eid==='B_SYNC_OFF'){if(confirm('Stop backing up from this phone?\n\nYour backup on GitHub stays as it is. The access key is removed from this phone.')){syncSetCfg(null);sSet('voy_sync_dirty','0');setSyncState('off');renderSyncSheet();toast('Backup disconnected');}return;}
     if(eid==='B_GEN_LIST_CLOSE'){closeOvl('OVL_GEN_LIST');return;}
     if(eid==='B_GEN_LIST_ADD'){closeOvl('OVL_GEN_LIST');openGenForm(el.dataset.type);return;}
     if(a==='gen-list-edit'){
@@ -2937,6 +3216,7 @@ document.getElementById('F_ICON_IMAGE').addEventListener('change',function(){
 });
 
 load();
+setTimeout(startSync,0);
 function setSortLabel(){document.getElementById('B_SORT').innerHTML={upcoming:'<span class="ticon">📅</span>Upcoming',newest:'<span class="ticon">🔽</span>Newest',oldest:'<span class="ticon">🔼</span>Oldest'}[sortMode]||'';}
 setSortLabel();
 fillCurSelect('F_TCUR','ILS');
