@@ -314,7 +314,7 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(.5)}
     <div class="handle"></div>
     <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:18px">
       <h2 style="margin-bottom:0">Settings</h2>
-      <span style="font-size:11px;color:var(--muted);font-family:var(--fb)">v1.27</span>
+      <span style="font-size:11px;color:var(--muted);font-family:var(--fb)">v1.28</span>
     </div>
     <div class="field"><label>Primary Currency (your home currency)</label>
       <select id="F_PRIMCUR"></select>
@@ -746,6 +746,9 @@ function renderHome(){
 // ══════════════════════ BOOKING QUICK VIEW ══════════════════════
 // Lit when the trip has an expense of that kind (or a boarding pass / voucher); grey when not yet.
 function bookedHTML(t){
+  // Only for trips that haven't ended yet
+  var endD=isoDate(t.end)||isoDate(t.start);
+  if(endD&&endD<toDateStr(new Date()))return '';
   var gen=t.gen||[],has=function(type){return gen.some(function(e){return e.type===type&&((e.amt||0)>0||(e.vouchers||[]).length);});};
   var hotelDay=Object.keys(t.day||{}).some(function(d){return (t.day[d]||[]).some(function(e){return e.cat==='hotel'&&(e.amt||0)>0;});});
   var items=[
