@@ -46,6 +46,11 @@ body{background:var(--bg);color:var(--text);font-family:var(--fb);min-height:100
 .cd-sep{font-family:var(--fh);font-size:16px;font-weight:800;color:var(--accent);opacity:.7}
 .cd-now{font-family:var(--fh);font-size:16px;font-weight:800;color:var(--green)}
 .cd-chip{display:inline-block;margin-left:6px;padding:1px 7px;border-radius:10px;background:rgba(240,165,0,0.14);color:var(--accent);font-size:10px;font-weight:700;vertical-align:1px}
+.bk-row{display:flex;gap:6px;margin-top:6px}
+.bk{position:relative;display:inline-flex;align-items:center;justify-content:center;width:26px;height:22px;border-radius:7px;font-size:12px;background:rgba(255,255,255,0.03);border:1px dashed rgba(255,255,255,0.14);filter:grayscale(1);opacity:.45}
+.bk.on{background:rgba(45,212,160,0.12);border:1px solid rgba(45,212,160,0.45);filter:none;opacity:1}
+.bk-dot{position:absolute;top:-3px;right:-3px;width:7px;height:7px;border-radius:50%;background:var(--muted);border:1.5px solid var(--surf)}
+.bk.on .bk-dot{background:var(--green)}
 .trip-card{background:var(--surf);border:1px solid var(--border);border-radius:var(--r);margin-bottom:12px;overflow:hidden}
 .trip-head{display:flex;align-items:center;gap:12px;padding:14px;cursor:pointer;user-select:none}
 .trip-icon{width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0}
@@ -309,7 +314,7 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(.5)}
     <div class="handle"></div>
     <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:18px">
       <h2 style="margin-bottom:0">Settings</h2>
-      <span style="font-size:11px;color:var(--muted);font-family:var(--fb)">v1.26</span>
+      <span style="font-size:11px;color:var(--muted);font-family:var(--fb)">v1.27</span>
     </div>
     <div class="field"><label>Primary Currency (your home currency)</label>
       <select id="F_PRIMCUR"></select>
@@ -716,7 +721,7 @@ function renderHome(){
     var iconContent=t.iconImage?'':t.emoji;
     html+='<div class="trip-icon" style="'+iconStyle+';">'+iconContent+'</div>';
     html+='<div class="trip-info"><div class="trip-name">'+t.name+'</div>';
-    html+='<div class="trip-sub">'+(t.start?fdate(t.start)+' to '+fdate(t.end):'No dates')+'<br>'+nd+' day'+(nd!==1?'s':'')+chip+'</div></div>';
+    html+='<div class="trip-sub">'+(t.start?fdate(t.start)+' to '+fdate(t.end):'No dates')+'<br>'+nd+' day'+(nd!==1?'s':'')+chip+'</div>'+bookedHTML(t)+'</div>';
     html+='<div class="trip-amt">';
     html+='<div class="big">'+fmt(totP,prim)+'</div>';
     if(hasSec)html+='<div class="small">'+fmt(tot,cur)+'</div>';
@@ -736,6 +741,21 @@ function renderHome(){
   });
   el.innerHTML=html;
   tickCountdown();
+}
+
+// ══════════════════════ BOOKING QUICK VIEW ══════════════════════
+// Lit when the trip has an expense of that kind (or a boarding pass / voucher); grey when not yet.
+function bookedHTML(t){
+  var gen=t.gen||[],has=function(type){return gen.some(function(e){return e.type===type&&((e.amt||0)>0||(e.vouchers||[]).length);});};
+  var hotelDay=Object.keys(t.day||{}).some(function(d){return (t.day[d]||[]).some(function(e){return e.cat==='hotel'&&(e.amt||0)>0;});});
+  var items=[
+    {i:'✈️',l:'Flights',ok:has('flight')||(t.passes||[]).length>0},
+    {i:'🏨',l:'Hotel',ok:has('hotel')||hotelDay},
+    {i:'🛡️',l:'Insurance',ok:has('insurance')}
+  ];
+  return '<div class="bk-row">'+items.map(function(x){
+    return '<span class="bk'+(x.ok?' on':'')+'" title="'+x.l+(x.ok?': booked':': not booked yet')+'">'+x.i+'<span class="bk-dot"></span></span>';
+  }).join('')+'</div>';
 }
 
 // ══════════════════════ TRIP COUNTDOWN ══════════════════════
