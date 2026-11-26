@@ -37,7 +37,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--fb);min-height:100
 .cd-top{display:flex;align-items:center;gap:9px;margin-bottom:8px}
 .cd-icon{width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0}
 .cd-kicker{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);font-weight:700}
-.cd-name{font-family:var(--fh);font-weight:700;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cd-name{font-family:var(--fh);font-weight:700;font-size:14px;line-height:1.25;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .cd-date{font-size:11px;color:var(--muted)}
 .cd-units{display:grid;grid-template-columns:1fr auto 1fr auto 1fr;align-items:center;gap:5px}
 .cd-unit{background:rgba(15,25,35,0.55);border:1px solid var(--border);border-radius:9px;padding:5px 4px 4px;text-align:center}
@@ -66,7 +66,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--fb);min-height:100
 .trip-head{display:flex;align-items:center;gap:12px;padding:14px;cursor:pointer;user-select:none}
 .trip-icon{width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0}
 .trip-info{flex:1;min-width:0}
-.trip-name{font-family:var(--fh);font-weight:700;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.trip-name{font-family:var(--fh);font-weight:700;font-size:15px;line-height:1.25;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .trip-sub{font-size:11px;color:var(--muted);margin-top:2px;line-height:1.5}
 .trip-amt{text-align:right;flex-shrink:0;min-width:0;max-width:110px}
 .trip-amt .big{font-family:var(--fh);font-weight:700;font-size:14px;color:var(--accent)}
@@ -333,7 +333,7 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(.5)}
     <div class="handle"></div>
     <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:18px">
       <h2 style="margin-bottom:0">Settings</h2>
-      <span style="font-size:11px;color:var(--muted);font-family:var(--fb)">v1.29</span>
+      <span style="font-size:11px;color:var(--muted);font-family:var(--fb)">v1.30</span>
     </div>
     <div class="field"><label>Primary Currency (your home currency)</label>
       <select id="F_PRIMCUR"></select>
@@ -524,6 +524,23 @@ var EMOJIS=['✈️','🌍','🏖️','🏔️','🗼','🌸','🎡','🏝️','
 var COLORS=['#f0a500','#e05c2a','#2dd4a0','#3b82f6','#7c6fcd','#f05252','#10b981','#ec4899','#0891b2','#f97316','#1e3a5f','#4a1942','#064e3b','#374151','#f8fafc','#fef3c7'];
 var GTYPES={flight:{i:'✈️',l:'Flights'},hotel:{i:'🏨',l:'Hotels'},gas:{i:'⛽',l:'Gas'},car:{i:'🚗',l:'Car/Train'},insurance:{i:'🛡️',l:'Insurance'},visa:{i:'📋',l:'Visa/Entry'},attractions:{i:'🎟️',l:'Attractions'},groceries:{i:'🛒',l:'Food/Groceries'},restaurant:{i:'🍽️',l:'Restaurants'},other:{i:'📦',l:'Other'}};
 var CCOLORS={food:'#f0a500',supermarket:'#84cc16',transport:'#2dd4a0',gas:'#f97316',hotel:'#7c6fcd',activities:'#e05c2a',shopping:'#f05252',other:'#7a8fa6',flight:'#3b82f6',car:'#06b6d4',insurance:'#8b5cf6',visa:'#ec4899',attractions:'#f97316',groceries:'#84cc16',restaurant:'#f0a500'};
+// Calendars open where it makes sense: expense dates at the trip's start, "to" dates at the chosen "from" date.
+// (The phone's calendar opens on today's date unless it is outside min/max — so we set min/max.)
+function setGenDateBounds(){
+  var t=getTrip(curTripId);if(!t)return;
+  var f=document.getElementById('F_GDATE_FROM'),to=document.getElementById('F_GDATE_TO');
+  var start=isoDate(t.start),end=isoDate(t.end),today=toDateStr(new Date());
+  f.min=start||'';
+  f.max=(end&&end<today)?end:'';                 // past trip: open near the trip, not on today
+  to.min=f.value||start||'';
+  to.max=f.max;
+  if(to.value&&f.value&&to.value<f.value)to.value='';
+}
+function setTripDateBounds(){
+  var a=document.getElementById('F_TSTART'),b=document.getElementById('F_TEND');
+  b.min=a.value||'';
+  if(b.value&&a.value&&b.value<a.value)b.value='';
+}
 function toggleGenDates(){
   var type=document.getElementById('F_GTYPE').value;
   var show=(type==='flight'||type==='hotel'||type==='car');
@@ -1540,8 +1557,9 @@ function renderVoucherReview(){
     if(r.error)html+='<div class="pass-warn">⚠️ '+esc(r.error)+'</div>';
     else if(!m.found)html+='<div class="pass-warn">Couldn\'t read the details automatically'+(/pdf/i.test(r.file.type)?'':' (images can\'t be read)')+'. Please fill them in.</div>';
     html+='<div class="field"><label>'+VT.nameLbl+'</label><input data-vq="'+qi+'" data-k="name" value="'+esc(m.name)+'" placeholder="'+(_vType==='hotel'?'e.g. Hotel Avenida Palace':'e.g. Sixt · VW Golf')+'"></div>';
-    html+='<div class="frow"><div class="field"><label>'+VT.fromLbl+'</label><input type="date" data-vq="'+qi+'" data-k="from" value="'+esc(m.from)+'"></div>';
-    html+='<div class="field"><label>'+VT.toLbl+'</label><input type="date" data-vq="'+qi+'" data-k="to" value="'+esc(m.to)+'"></div></div>';
+    var tst=isoDate(t.start)||'';
+    html+='<div class="frow"><div class="field"><label>'+VT.fromLbl+'</label><input type="date" data-vq="'+qi+'" data-k="from" value="'+esc(m.from)+'" min="'+tst+'"></div>';
+    html+='<div class="field"><label>'+VT.toLbl+'</label><input type="date" data-vq="'+qi+'" data-k="to" value="'+esc(m.to)+'" min="'+esc(m.from||tst)+'"></div></div>';
     html+='<div class="frow"><div class="field"><label>Confirmation #</label><input data-vq="'+qi+'" data-k="conf" value="'+esc(m.conf)+'"></div>';
     html+='<div class="field"><label>Price'+(m.cur?' ('+esc(m.cur)+')':'')+'</label><input type="number" step="any" data-vq="'+qi+'" data-k="amt" value="'+(m.amt||'')+'" placeholder="optional"></div></div>';
     html+='<div class="field"><label>Attach to</label><select data-vq="'+qi+'" data-k="target">';
@@ -2083,7 +2101,7 @@ function renderDetail(){
   html+='<div style="display:flex;align-items:flex-start;justify-content:space-between">';
   html+='<div style="display:flex;align-items:center;gap:10px">';
   html+='<div style="width:44px;height:44px;border-radius:13px;background:'+bg+';display:flex;align-items:center;justify-content:center;font-size:26px;flex-shrink:0">'+t.emoji+'</div>';
-  html+='<div><div style="font-family:var(--fh);font-size:19px;font-weight:800">'+t.name+'</div>';
+  html+='<div style="min-width:0"><div style="font-family:var(--fh);font-size:19px;font-weight:800;line-height:1.2;overflow-wrap:anywhere">'+t.name+'</div>';
   html+='<div style="font-size:11px;color:var(--muted);margin-top:3px">'+(t.start?fdate(t.start)+' to '+fdate(t.end):'No dates')+' · '+dd.length+' days</div>';
   if(t.desc)html+='<div style="font-size:12px;color:var(--muted);font-style:italic;margin-top:4px;line-height:1.4">'+t.desc+'</div>';
   html+='</div></div>';
@@ -2145,6 +2163,7 @@ function openTripForm(id){
     fillCurSelect('F_TCUR','ILS');
   }
   buildPickers();updatePreview();
+  setTripDateBounds();
   openOvl('OVL_TRIP');
 }
 function buildPickers(){
@@ -2336,6 +2355,7 @@ function openGenForm(type,editIdx){
     document.getElementById('B_GEN_SAVE').textContent='Add';
   }
   toggleGenDates();
+  setGenDateBounds();
   openOvl('OVL_GEN');
 }
 function saveGen(){
@@ -3179,6 +3199,14 @@ document.addEventListener('click',function(e){
 document.getElementById('F_SECCUR').addEventListener('change',function(){updateRateFields(this.value);});
 document.getElementById('F_PRIMCUR').addEventListener('change',function(){updateRateFields(document.getElementById('F_SECCUR').value);});
 document.getElementById('F_GTYPE').addEventListener('change',toggleGenDates);
+document.getElementById('F_GDATE_FROM').addEventListener('change',setGenDateBounds);
+document.getElementById('F_TSTART').addEventListener('change',setTripDateBounds);
+// voucher review: "to" calendar opens at the chosen "from" date
+document.addEventListener('change',function(e){
+  var el=e.target;if(!el||!el.dataset||el.dataset.k!=='from'||el.dataset.vq===undefined)return;
+  var to=document.querySelector('#VOUCHER_REVIEW input[data-vq="'+el.dataset.vq+'"][data-k="to"]');
+  if(to){to.min=el.value||'';if(to.value&&el.value&&to.value<el.value)to.value='';}
+});
 document.getElementById('F_PASS_FILE').addEventListener('change',function(){handlePassFiles(this.files);});
 document.getElementById('F_VOUCHER_FILE').addEventListener('change',function(){handleVoucherFiles(this.files);});
 document.getElementById('F_IMPORT_FILE').addEventListener('change',function(){
